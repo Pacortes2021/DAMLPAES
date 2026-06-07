@@ -1,0 +1,24 @@
+# ── Sistema / Python ──────────────────────────────────────────────
+.DS_Store
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.claude/
+
+# ── Datos pesados (NO se versionan) ───────────────────────────────
+# Los datos crudos se descargan del portal DEMRE; los procesados se
+# regeneran con scripts/00_build_dataset.py. Ver README.
+data/raw/
+data/processed/*
+# … excepto los artefactos chicos que el dashboard necesita al clonar:
+!data/processed/carrera_stats.json
+!data/processed/catalogo_carreras.parquet
+!data/processed/labels.json
+!data/processed/conversiones.json
+!data/processed/territorio_stats.json
+
+# ── Código/artefactos archivados (referencia local, no al repo) ──
+legacy/
+
+# ── Respaldo de historial git antiguo (si se crea) ────────────────
+.git_backup*/
