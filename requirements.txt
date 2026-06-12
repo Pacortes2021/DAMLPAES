@@ -1,8 +1,8 @@
 # DAML 2026 · Grupo 5 — dependencias
 # Dashboard (src/app.py)
 pandas
-numpy
-scikit-learn
+numpy<2.1
+scikit-learn==1.6.1
 joblib
 plotly
 streamlit
