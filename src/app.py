@@ -29,6 +29,12 @@ st.markdown(f"""
           border-radius:12px;padding:12px 14px;box-shadow:0 2px 8px rgba(30,58,138,.06);}}
   .stat .v {{font-size:1.45rem;font-weight:800;color:{AZUL_OSC};line-height:1;}}
   .stat .l {{font-size:.72rem;color:#64748b;margin-top:5px;text-transform:uppercase;letter-spacing:.03em;}}
+  .pchips {{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 2px 0;}}
+  .pchip {{background:white;border:1px solid #d6e2ff;border-radius:999px;padding:5px 13px;font-size:.86rem;
+           color:{AZUL_OSC};box-shadow:0 1px 4px rgba(30,58,138,.06);white-space:nowrap;}}
+  .pchip b {{font-size:1rem;color:{AZUL};}}
+  .pchip.ob {{background:{AZUL};border-color:{AZUL};color:white;}}
+  .pchip.ob b {{color:white;}}
   .nota {{background:#dbeafe;border-left:5px solid {AZUL};padding:13px 16px;border-radius:10px;font-size:.92rem;color:#1e3a8a;margin-top:10px;}}
   .warn {{background:#fff6e6;border-left:5px solid #f0a020;padding:13px 16px;border-radius:10px;font-size:.9rem;color:#7c5a00;margin-top:10px;}}
   [data-testid="stMetric"] {{background:white;border:1px solid #e2e8f5;border-radius:12px;padding:10px 14px;box-shadow:0 2px 8px rgba(30,58,138,.06);}}
@@ -117,6 +123,33 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def ponderaciones_html(row):
+    """Fila de chips con la ponderación (%) de cada prueba. Obligatorias (Notas, Ranking,
+    C. Lectora, Matem. M1) resaltadas. Historia y Ciencias son electivos ALTERNATIVOS:
+    cuenta el mejor (igual que el modelo en ponderado()), no se suman ambos."""
+    obligatorias = {"%_NOTAS", "%_Ranking", "%_LENG", "%_MATE1"}
+    base = [("Notas", "%_NOTAS"), ("Ranking", "%_Ranking"), ("C. Lectora", "%_LENG"),
+            ("Matem. M1", "%_MATE1"), ("Matem. M2", "%_MATE2")]
+    chips, total = [], 0.0
+    for lbl, col in base:
+        w = row.get(col)
+        if w is None or w != w or float(w) == 0:
+            continue
+        total += float(w)
+        cls = "pchip ob" if col in obligatorias else "pchip"
+        chips.append(f"<span class='{cls}'><b>{float(w):.0f}%</b> {lbl}</span>")
+    # electivo Historia/Ciencias: se computa el mejor de los dos, no la suma
+    hy = row.get("%_HYCS"); ci = row.get("%_CIEN")
+    hy = 0.0 if (hy is None or hy != hy) else float(hy)
+    ci = 0.0 if (ci is None or ci != ci) else float(ci)
+    if hy > 0 or ci > 0:
+        we = max(hy, ci); total += we
+        etq = ("Historia o Ciencias" if hy > 0 and ci > 0 else "Historia" if hy > 0 else "Ciencias")
+        chips.append(f"<span class='pchip'><b>{we:.0f}%</b> {etq}</span>")
+    extra = "" if total >= 99 else f"<span class='pchip'>+ prueba especial ({100-total:.0f}%)</span>"
+    return "<div class='pchips'>" + "".join(chips) + extra + "</div>"
+
+
 def cf_dependencia(base: Perfil, modo: str) -> dict:
     out = {}
     for code, lbl in L["dependencia"].items():
@@ -173,6 +206,10 @@ with cL:
                     unsafe_allow_html=True)
 with cR:
     st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
+
+st.markdown("<div class='sec' style='margin-top:2px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b> "
+            "<span style='color:#64748b;font-size:.85rem'>· en azul, las 4 obligatorias · Historia/Ciencias es electivo (cuenta el mejor)</span></div>"
+            + ponderaciones_html(row), unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 2 · PERFIL (página principal)
 st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
