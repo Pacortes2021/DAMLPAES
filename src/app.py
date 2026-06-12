@@ -160,8 +160,8 @@ def cf_dependencia(base: Perfil, modo: str) -> dict:
 # ----------------------------------------------------------------- hero
 st.markdown("""
 <div class='hero'><h1>🎓 ¿Quedaré en mi primera preferencia?</h1>
-<p>Determinantes del acceso a 1ª preferencia universitaria (modalidad regular).
-Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · Grupo 5</p></div>
+<p>Acceso a 1ª preferencia universitaria <b>antes</b> y <b>después</b> de la PAES, y el <b>retorno económico</b>
+de la carrera. Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · Grupo 5</p></div>
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 1 · CARRERA (página principal)
