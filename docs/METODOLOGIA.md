@@ -149,3 +149,49 @@ mostrar que el puntaje mismo está condicionado por el origen — la desigualdad
 
 > Limitación: **género no está disponible** a nivel individuo en los archivos DEMRE (ArchivoC/D); solo
 > existe la modalidad de admisión `TIPO_PREF='GENERO'`, que no es el sexo del postulante.
+
+---
+
+## 8. Módulo de retorno económico (pestaña 💰)
+
+Responde a la parte de la visión del producto sobre **ingresos futuros y amenidades** de la oferta.
+No es un modelo entrenado: es una **calculadora financiera determinística** sobre parámetros referenciales.
+
+### Datos y procedencia
+- **Fuente:** SIES — *Servicio de Información de Educación Superior* (mifuturo.cl), reportes
+  *Empleabilidad e Ingresos*. Variables: empleabilidad al 1er año, ingreso mensual mediano al 4° año,
+  arancel anual y duración.
+- **Granularidad:** los valores se asignan por **familia de carrera / área de conocimiento** mediante
+  un clasificador de palabras clave sobre el nombre (normalizado sin tildes). **No** son por programa
+  exacto. Cobertura del catálogo: **100%** (1 caso genérico inclasificable usa el valor por defecto).
+  El matching es ordenado (lo específico vence a lo genérico: p.ej. *veterinaria* antes que *medicina*,
+  *pedagogía en historia* → Educación antes que la regla de *historia* → Cs. Sociales).
+
+### Indicadores (en `src/finanzas.py`, función `indicadores`)
+Con `arancel` (editable; 0 si gratuidad), `duracion` (años), `empleabilidad` (e), `ingreso` mensual,
+y un `sueldo_base` sin educación superior (referencial $550.000/mes, editable):
+
+| Indicador | Definición |
+|---|---|
+| Inversión en arancel | `arancel × duración` |
+| Costo de oportunidad | `sueldo_base × 12 × duración` (lo que se deja de ganar estudiando) |
+| Ingreso anual esperado | `ingreso × 12 × e` (ajustado por probabilidad de empleo) |
+| **Premium anual** | `ingreso_esperado − sueldo_base × 12` (ganancia vs. no estudiar) |
+| **Payback** | `inversión_arancel / premium_anual` (años para recuperar el arancel) |
+| **ROI a 10 años** | `(premium_anual × 10 − inversión_arancel) / inversión_arancel` |
+| **VAN** | flujos descontados (arancel durante estudios, premium en vida laboral), tasa 6% |
+| Break-even | primer año con flujo de caja acumulado ≥ 0 |
+
+El gráfico de **flujo de caja acumulado** hace visible el punto de equilibrio: baja mientras se paga
+arancel y sube con el premium una vez titulado.
+
+### Decisiones y limitaciones (para la defensa)
+- **D-F1** El ingreso se ajusta por empleabilidad (valor esperado), lo que penaliza correctamente
+  carreras con alta cesantía; puede dar *premium* negativo (se declara con un aviso, sin break-even).
+- **D-F2** El comparador es el ingreso sin educación superior (floor), no el costo total con interés:
+  es una estimación de **orden de magnitud**, no una evaluación financiera con TIR/impuestos.
+- **D-F3** Cifras **agregadas y referenciales**: dos programas de la misma familia comparten parámetros.
+  La gratuidad y el arancel propio son editables por el usuario para acercarlo a su caso.
+- **No constituye asesoría financiera.** Se acompaña de un *disclaimer* explícito en la interfaz.
+- Validado con tests (`tests/test_finanzas.py`, 17 casos) y prueba end-to-end de la app
+  (`streamlit.testing`): matching, prioridad, cobertura, indicadores, gratuidad y break-even.

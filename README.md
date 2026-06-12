@@ -40,6 +40,9 @@ python3 scripts/01_build_models.py
 
 # 3. Lanza el dashboard
 streamlit run src/app.py        # o:  python3 -m streamlit run src/app.py
+
+# (opcional) corre los tests del módulo de retorno económico
+python3 tests/test_finanzas.py  # o:  pytest tests/test_finanzas.py
 ```
 
 ---

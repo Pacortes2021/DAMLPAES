@@ -147,6 +147,20 @@ def fig_breakeven(ind, dur):
     return fig
 
 
+def fig_ingresos(pf, sueldo_base, ingreso_esperado_mensual):
+    """Barra comparativa de ingreso mensual: sin estudiar vs esperado vs pleno empleo."""
+    cats = ["Sin estudiar", "Esperado (tu carrera)", "Si estás empleado/a"]
+    vals = [sueldo_base, ingreso_esperado_mensual, pf.ingreso]
+    cols = ["#94a3b8", AZUL, "#16a34a"]
+    fig = go.Figure(go.Bar(x=vals, y=cats, orientation="h", marker_color=cols,
+        text=[peso(v) for v in vals], textposition="outside", textfont=dict(color=AZUL_OSC, size=12)))
+    fig.update_layout(height=210, margin=dict(l=10, r=90, t=40, b=10),
+        title=dict(text="💵 Ingreso mensual comparado", font=dict(size=14, color=AZUL_OSC)),
+        xaxis=dict(title="CLP/mes", showgrid=True, gridcolor="#eef", range=[0, pf.ingreso * 1.25]),
+        yaxis=dict(autorange="reversed"), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
 def cf_dependencia(base: Perfil, modo: str) -> dict:
     out = {}
     for code, lbl in L["dependencia"].items():
@@ -368,6 +382,11 @@ with tab3:
         st.caption(f"Perfil asignado: **{pf.area}** · "
                    + ("match por carrera" if pf.match == "carrera"
                       else "promedio del área" if pf.match == "area" else "valor genérico (carrera sin clasificar)"))
+
+    st.plotly_chart(fig_ingresos(pf, sueldo_base, ind["ingreso_anual_esperado"] / 12),
+                    use_container_width=True, key="ingresos")
+    st.caption("El **ingreso esperado** descuenta la probabilidad de no encontrar empleo "
+               "(ingreso pleno × empleabilidad); por eso es menor que el sueldo *si estás empleado/a*.")
 
     if pf.empleabilidad < 62 or pf.ingreso < 950_000:
         st.markdown("<div class='warn'>⚠️ Esta familia de carrera tiene empleabilidad o ingreso "
