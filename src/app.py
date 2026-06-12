@@ -77,7 +77,7 @@ def fig_radar(row):
     fig = go.Figure(go.Scatterpolar(r=vals + [vals[0]], theta=cats + [cats[0]], fill="toself",
         fillcolor="rgba(37,99,235,.22)", line=dict(color=AZUL, width=2),
         text=[f"{v:.0f}%" for v in vals] + [""], hovertemplate="%{theta}: %{r:.0f}%<extra></extra>"))
-    fig.update_layout(height=330, margin=dict(l=40, r=40, t=46, b=20),
+    fig.update_layout(height=300, margin=dict(l=40, r=40, t=40, b=16),
         title=dict(text="⚖️ Ponderaciones que exige la carrera", font=dict(size=14, color=AZUL_OSC)),
         polar=dict(radialaxis=dict(range=[0, max(vals)*1.15 if max(vals) else 40], ticksuffix="%",
                                    tickfont=dict(size=9)), angularaxis=dict(tickfont=dict(size=11, color=AZUL_OSC))),
@@ -204,12 +204,11 @@ with cL:
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
+                "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (se cuenta el mejor)</span></div>"
+                + ponderaciones_html(row), unsafe_allow_html=True)
 with cR:
     st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
-
-st.markdown("<div class='sec' style='margin-top:2px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b> "
-            "<span style='color:#64748b;font-size:.85rem'>· en azul, las 4 obligatorias · Historia/Ciencias es electivo (cuenta el mejor)</span></div>"
-            + ponderaciones_html(row), unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 2 · PERFIL (página principal)
 st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
