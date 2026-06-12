@@ -12,7 +12,6 @@ from dataclasses import replace
 import streamlit as st
 import plotly.graph_objects as go
 from inference import load_artifacts, Perfil, predecir, predecir_puntaje
-from finanzas import perfil_financiero, indicadores, SUELDO_SIN_TITULO
 
 st.set_page_config(page_title="¿Quedo en mi 1ª preferencia?", page_icon="🎓", layout="wide")
 AZUL, AZUL_OSC = "#2563eb", "#1e3a8a"
@@ -118,49 +117,6 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
-def peso(x):
-    """Formato moneda chilena: $1.234.567."""
-    return "$" + f"{x:,.0f}".replace(",", ".")
-
-
-def fig_breakeven(ind, dur):
-    """Curva de flujo de caja acumulado vs. no estudiar (punto de equilibrio)."""
-    t, acum = ind["flujo_t"], [a / 1e6 for a in ind["flujo_acum"]]
-    fig = go.Figure()
-    fig.add_vrect(x0=0, x1=dur, fillcolor="#fde2e2", opacity=.45, line_width=0,
-                  annotation_text="Estudiando", annotation_position="top left",
-                  annotation_font=dict(size=10, color="#b91c1c"))
-    fig.add_trace(go.Scatter(x=t, y=acum, mode="lines", fill="tozeroy",
-                  line=dict(color=AZUL, width=3), fillcolor="rgba(37,99,235,.14)",
-                  hovertemplate="Año %{x}: $%{y:.1f}M<extra></extra>"))
-    fig.add_hline(y=0, line=dict(color="#94a3b8", width=1, dash="dot"))
-    be = ind["break_even_anio"]
-    if be is not None:
-        fig.add_vline(x=be, line=dict(color="#16a34a", width=2, dash="dash"))
-        fig.add_annotation(x=be, y=0, text=f"<b>Recuperas lo invertido<br>año {be}</b>",
-                           showarrow=True, arrowhead=2, ay=-45, font=dict(color="#16a34a", size=11))
-    fig.update_layout(height=330, margin=dict(l=10, r=20, t=44, b=10),
-        title=dict(text="📈 Ganancia acumulada respecto a no estudiar", font=dict(size=14, color=AZUL_OSC)),
-        xaxis=dict(title="Años desde que entras a la carrera", showgrid=True, gridcolor="#eef"),
-        yaxis=dict(title="Millones CLP", ticksuffix="M", showgrid=True, gridcolor="#eef", zeroline=False),
-        plot_bgcolor="white", paper_bgcolor="white", showlegend=False)
-    return fig
-
-
-def fig_ingresos(pf, sueldo_base, ingreso_esperado_mensual):
-    """Barra comparativa de ingreso mensual: sin estudiar vs esperado vs pleno empleo."""
-    cats = ["Sin estudiar", "Esperado (tu carrera)", "Si estás empleado/a"]
-    vals = [sueldo_base, ingreso_esperado_mensual, pf.ingreso]
-    cols = ["#94a3b8", AZUL, "#16a34a"]
-    fig = go.Figure(go.Bar(x=vals, y=cats, orientation="h", marker_color=cols,
-        text=[peso(v) for v in vals], textposition="outside", textfont=dict(color=AZUL_OSC, size=12)))
-    fig.update_layout(height=210, margin=dict(l=10, r=90, t=40, b=10),
-        title=dict(text="💵 Ingreso mensual comparado", font=dict(size=14, color=AZUL_OSC)),
-        xaxis=dict(title="CLP/mes", showgrid=True, gridcolor="#eef", range=[0, pf.ingreso * 1.25]),
-        yaxis=dict(autorange="reversed"), plot_bgcolor="white", paper_bgcolor="white")
-    return fig
-
-
 def cf_dependencia(base: Perfil, modo: str) -> dict:
     out = {}
     for code, lbl in L["dependencia"].items():
@@ -174,22 +130,31 @@ def cf_dependencia(base: Perfil, modo: str) -> dict:
 # ----------------------------------------------------------------- hero
 st.markdown("""
 <div class='hero'><h1>🎓 ¿Quedaré en mi primera preferencia?</h1>
-<p>Acceso a 1ª preferencia universitaria <b>antes</b> y <b>después</b> de la PAES, y el <b>retorno económico</b>
-de la carrera. Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · Grupo 5</p></div>
+<p>Acceso a 1ª preferencia universitaria <b>antes</b> y <b>después</b> de la PAES.
+Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · Grupo 5</p></div>
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 1 · CARRERA (página principal)
 cat = art.catalogo.copy()
 cat["reg_nom"] = cat["REGION_CASA_MATRIZ"].astype("Int64").astype(str).map(L["region"]).fillna("")
-# desambiguación: nombre — universidad · región (cód) — los duplicados son códigos distintos sin sede en los datos
-cat["display"] = (cat["NOMBRE_CARRERA"].fillna("¿?") + " — " + cat["NOMBRE_UNIVERSIDAD"].fillna("¿?")
-                  + " · " + cat["reg_nom"] + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
-cat = cat.sort_values("display")
+# normalización a MAYÚSCULAS: unifica "Ingeniería" e "INGENIERÍA" (mismo nombre, distinta caja)
+cat["CARRERA_U"] = cat["NOMBRE_CARRERA"].fillna("¿?").str.upper().str.strip()
+cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").str.upper().str.strip()
+# desambiguación de universidad: universidad · región (cód) — cada opción mapea a UN código
+cat["univ_display"] = (cat["UNIV_U"] + " · " + cat["reg_nom"].str.upper()
+                       + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
 
-st.markdown("<div class='sec'><h3>1 · Elige la carrera</h3></div>", unsafe_allow_html=True)
-sel = st.selectbox("Carrera (escribe para buscar; si se repite, distínguelas por región/código/corte)",
-                   cat["display"].tolist())
-row = cat[cat["display"] == sel].iloc[0]
+st.markdown("<div class='sec'><h3>1 · Elige la carrera y la universidad</h3></div>", unsafe_allow_html=True)
+sc1, sc2 = st.columns(2)
+with sc1:
+    carreras = sorted(cat["CARRERA_U"].unique())
+    idx0 = carreras.index("ARQUITECTURA") if "ARQUITECTURA" in carreras else 0
+    carrera_sel = st.selectbox("Carrera (escribe para buscar)", carreras, index=idx0)
+with sc2:
+    subset = cat[cat["CARRERA_U"] == carrera_sel].sort_values("univ_display")
+    uni_sel = st.selectbox(f"Universidad que la imparte · {len(subset)} opción(es)",
+                           subset["univ_display"].tolist())
+row = subset[subset["univ_display"] == uni_sel].iloc[0]
 cod = int(row["CODIGO_CARRERA"])
 st_info = art.stats.get(str(cod))
 
@@ -202,7 +167,7 @@ with cL:
                 f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Sel. 2025</div></div>"
                 f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                 unsafe_allow_html=True)
-    st.caption(f"📍 {row['NOMBRE_UNIVERSIDAD']} · Región {row['reg_nom']} · código {cod}")
+    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}")
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
@@ -257,7 +222,7 @@ perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=p
 
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
 st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
-tab1, tab2, tab3 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES", "💰 ¿Conviene económicamente?"])
+tab1, tab2 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES"])
 
 with tab1:
     st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
@@ -333,66 +298,6 @@ with tab2:
                     f"porque actuaba <i>a través</i> del puntaje: <b>origen → puntaje → acceso</b>.</div>",
                     unsafe_allow_html=True)
 
-with tab3:
-    st.caption("Más allá de *quedar*: ¿esta carrera **vale la pena** en ingreso y empleo? "
-               "Cifras referenciales agregadas (SIES · mifuturo.cl), asignadas por familia de carrera. "
-               "Estimación de orden de magnitud — **no es asesoría financiera**.")
-    pf = perfil_financiero(str(row["NOMBRE_CARRERA"]))
-
-    with st.container(border=True):
-        st.markdown("**⚙️ Supuestos** — ajústalos a tu caso")
-        s1, s2, s3 = st.columns(3)
-        gratuidad = s1.checkbox("Tengo gratuidad (arancel $0)", value=False)
-        arancel_in = s2.number_input("Arancel anual (CLP)", 0, 12_000_000, int(pf.arancel),
-                                     100_000, disabled=gratuidad,
-                                     help=f"Estimado para {pf.area}. Edítalo con el de tu universidad.")
-        sueldo_base = s3.number_input("Sueldo sin título (CLP/mes)", 300_000, 1_500_000,
-                                      SUELDO_SIN_TITULO, 50_000,
-                                      help="Con qué te comparas: lo que ganarías sin educación superior.")
-
-    ind = indicadores(pf, arancel=arancel_in, gratuidad=gratuidad, sueldo_base=sueldo_base)
-    pay = ind["payback_anios"]
-    pay_txt = "Inmediato" if pay <= 0 else (f"{pay:.1f} años" if pay < 25 else ">25 años")
-    roi_txt = "∞ (gratuidad)" if ind["roi_10"] == float("inf") else f"{ind['roi_10']:.0f}%"
-
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("💼 Empleabilidad 1er año", f"{pf.empleabilidad:.0f}%")
-    k2.metric("💵 Ingreso mensual (4° año)", peso(pf.ingreso), help="Mediana al 4° año de titulación (bruto).")
-    k3.metric("🎓 Costo arancel carrera", peso(ind["inversion_arancel"]),
-              help=f"Arancel × {pf.duracion:.0f} años de duración.")
-    k4.metric("⏱️ Recuperas lo invertido", pay_txt, help="Años trabajando para pagar el arancel con tu mayor ingreso.")
-    k5.metric("📊 Retorno a 10 años", roi_txt, help="Ganancia extra acumulada vs. el arancel pagado.")
-
-    cF1, cF2 = st.columns([1.4, 1])
-    with cF1:
-        st.plotly_chart(fig_breakeven(ind, pf.duracion), use_container_width=True, key="breakeven")
-    with cF2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        prem_m = ind["premium_anual"] / 12
-        st.markdown(
-            f"<div class='nota'>💡 <b>Cómo leerlo</b><br>"
-            f"Durante <b>{pf.duracion:.0f} años</b> pagas arancel (zona roja, el flujo baja). "
-            f"Al titularte ganas en promedio <b>{peso(prem_m)}/mes más</b> que sin estudiar "
-            f"(ajustado por empleabilidad), y la curva sube. Cruza el cero "
-            + (f"el <b>año {ind['break_even_anio']}</b>: ahí ya recuperaste todo lo invertido."
-               if ind["break_even_anio"] is not None else "más allá del horizonte mostrado.")
-            + "</div>", unsafe_allow_html=True)
-        st.metric("Costo de oportunidad", peso(ind["costo_oportunidad"]),
-                  help="Lo que dejas de ganar mientras estudias (no es desembolso, pero es costo real).")
-        st.caption(f"Perfil asignado: **{pf.area}** · "
-                   + ("match por carrera" if pf.match == "carrera"
-                      else "promedio del área" if pf.match == "area" else "valor genérico (carrera sin clasificar)"))
-
-    st.plotly_chart(fig_ingresos(pf, sueldo_base, ind["ingreso_anual_esperado"] / 12),
-                    use_container_width=True, key="ingresos")
-    st.caption("El **ingreso esperado** descuenta la probabilidad de no encontrar empleo "
-               "(ingreso pleno × empleabilidad); por eso es menor que el sueldo *si estás empleado/a*.")
-
-    if pf.empleabilidad < 62 or pf.ingreso < 950_000:
-        st.markdown("<div class='warn'>⚠️ Esta familia de carrera tiene empleabilidad o ingreso "
-                    "<b>bajo el promedio</b>. El retorno económico no lo es todo —vocación e interés "
-                    "importan— pero conviene tenerlo presente.</div>", unsafe_allow_html=True)
-
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
     mt, mp = art.meta_post["metrics_temporal"], art.meta_pre["metrics_temporal"]
@@ -411,12 +316,6 @@ modelo de *regresión por cuantiles* (gradient boosting) que aprende, a partir d
 
 Así, entre P10 y P90 cae el **80% de los estudiantes con tu perfil**. Validamos que sea cierto: en 2026, ~80%
 de los puntajes reales cayeron dentro de su banda. Probabilidades de acceso **calibradas**.
-
-**Dimensión económica (pestaña 💰):** empleabilidad al 1er año, ingreso mediano al 4° año, arancel y
-duración son **cifras referenciales agregadas del SIES** (mifuturo.cl, reportes *Empleabilidad e Ingresos*),
-asignadas por **familia de carrera** mediante palabras clave (no por programa exacto). El retorno es una
-estimación de orden de magnitud: arancel desembolsado vs. el mayor ingreso esperado respecto a no estudiar.
-No constituye asesoría financiera.
 
 **Limitaciones:** género no disponible a nivel individuo en los datos DEMRE; las "carreras repetidas" son
 códigos distintos sin sede/jornada en la oferta (se distinguen por región, código y corte).
