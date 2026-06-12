@@ -62,6 +62,9 @@ PERFILES: dict[str, dict] = {
     # — Agro / Ciencias —
     "agronomia":     {"area": "Agropecuaria", "empleabilidad": 72, "ingreso": 1_150_000, "arancel": 4_200_000, "duracion": 5},
     "ciencias":      {"area": "Ciencias Básicas", "empleabilidad": 60, "ingreso": 1_000_000, "arancel": 4_000_000, "duracion": 5},
+    "terapia_ocup":  {"area": "Salud", "empleabilidad": 68, "ingreso": 1_050_000, "arancel": 3_900_000, "duracion": 5},
+    "publicidad":    {"area": "Administración y Comercio", "empleabilidad": 62, "ingreso":   950_000, "arancel": 3_800_000, "duracion": 5},
+    "humanidades":   {"area": "Humanidades", "empleabilidad": 56, "ingreso":   820_000, "arancel": 3_400_000, "duracion": 5},
 }
 
 # Promedios por área (fallback cuando no hay match específico). Fuente: SIES, agregados por área.
@@ -82,8 +85,10 @@ DEFAULT = {"area": "General", "empleabilidad": 68, "ingreso": 1_050_000, "arance
 # Reglas de matching (orden = prioridad; el primero que calza gana). Se evalúan sobre el
 # nombre NORMALIZADO (mayúsculas, sin tildes). Las más específicas/excluyentes van primero.
 _REGLAS: list[tuple[list[str], str]] = [
-    (["VETERINAR"], "veterinaria"),                       # antes que "MEDICINA"
+    # — Salud (específicas; veterinaria y tecnología médica antes que "MEDICINA") —
+    (["VETERINAR"], "veterinaria"),
     (["TECNOLOGIA MEDIC", "TECNOLOGO MEDIC"], "tecnologia_med"),
+    (["TERAPIA OCUPACIONAL"], "terapia_ocup"),
     (["MEDICINA"], "medicina"),
     (["ODONTOLOG"], "odontologia"),
     (["ENFERMER"], "enfermeria"),
@@ -92,31 +97,55 @@ _REGLAS: list[tuple[list[str], str]] = [
     (["NUTRICION", "DIETETICA"], "nutricion"),
     (["FONOAUDIOLOG"], "fonoaudiologia"),
     (["QUIMICA Y FARMACIA", "QUIMICO FARMAC", "FARMACIA"], "quim_farmacia"),
+    # — Tecnología / Ingeniería (menciones específicas antes que la genérica) —
     (["ICA EN COMPUTAC", "CIVIL EN COMPUTAC", "CIVIL INFORMAT", "CIVIL EN INFORMAT",
-      "INGENIERIA EN COMPUTAC", "INGENIERIA INFORMAT", "CIENCIA DE LA COMPUTAC"], "ing_civil_comp"),
+      "INGENIERIA EN COMPUTAC", "INGENIERIA INFORMAT", "CIENCIA DE LA COMPUTAC",
+      "COMPUTER SCIENCE", "DESARROLLO DE VIDEOJUEGO", "VIDEOJUEGOS Y SIMULACION"], "ing_civil_comp"),
     (["CIVIL INDUSTRIAL"], "ing_civil_ind"),
     (["INGENIERIA COMERCIAL"], "ing_comercial"),
     (["INGENIERIA CIVIL", "ING. CIVIL", "ING CIVIL"], "ing_civil"),
     (["GEOLOG"], "geologia"),
-    (["CONSTRUCCION CIVIL", "INGENIERIA EN CONSTRUCCION", "INGENIERIA CONSTRUCCION"], "construccion"),
-    (["INGENIERIA DE EJECUCION", "INGENIERIA EN EJECUCION", "INGENIERIA EN ", "INGENIERIA "], "ing_ejecucion"),
+    (["CONSTRUCCION CIVIL", "INGENIERIA EN CONSTRUCCION", "INGENIERIA CONSTRUCCION",
+      "TECNOLOGIA EN CONSTRUCC"], "construccion"),
+    (["INGENIERIA DE EJECUCION", "INGENIERIA EN EJECUCION", "BIOINGENIER",
+      "INGENIERIA", "PLAN COMUN"], "ing_ejecucion"),   # catch-all de ingenierías (civil/comercial ya filtradas)
+    # — Derecho / Negocios / Administración —
     (["DERECHO"], "derecho"),
     (["CONTADOR", "AUDITORIA", "AUDITOR"], "contador"),
+    (["PUBLICIDAD", "MARKETING"], "publicidad"),
+    (["NEGOCIOS", "BUSINESS", "INTERNATIONAL MANAGEMENT", "CONTROL DE GESTION"], "ing_comercial"),
+    (["TURISMO", "HOTELER", "GASTRONOM"], "publicidad"),
+    (["ADMINISTRACION", "GESTION DE PERSONAS", "GESTION PUBLICA", "GESTION Y "], "contador"),
+    # — Ciencias Sociales —
     (["PSICOLOG"], "psicologia"),
     (["TRABAJO SOCIAL", "SERVICIO SOCIAL"], "trabajo_social"),
     (["SOCIOLOG"], "sociologia"),
     (["PERIODISMO", "COMUNICACION"], "periodismo"),
-    (["PEDAGOGIA", "EDUCACION DE ", "EDUCACION EN ", "PROFESOR"], "pedagogia"),
-    (["PARVULAR", "EDUCACION DE PARVUL"], "parvularia"),
+    # — Educación (antes que Cs. Sociales para que "PEDAGOGÍA EN HISTORIA" sea pedagogía;
+    #   parvularia antes que la genérica; diferencial/básica no llevan la palabra "PEDAGOGIA") —
+    (["PARVULAR"], "parvularia"),
+    (["PEDAGOGIA", "PROFESOR", "EDUCACION DIFERENCIAL", "EDUCACION BASICA", "ED DIFERENCIAL",
+      "EDUCACION GENERAL BASICA", "EDUCACION FISICA", "EDUCACION DE ", "EDUCACION EN ",
+      "DEPORT", "ENTRENADOR"], "pedagogia"),
+    (["ARQUEOLOG", "ANTROPOLOG", "BIBLIOTECOLOG", "GESTION DE INFORMACION", "ARCHIVISTICA",
+      "ESTUDIOS INTERNACIONALES", "INTERNATIONAL STUDIES", "CIENCIA POLITICA", "GEOGRAFIA",
+      "HISTORIA", "CIENCIAS SOCIALES", "COLLEGE"], "psicologia"),
+    # — Arte y Arquitectura —
     (["ARQUITECTURA"], "arquitectura"),
     (["DISENO"], "diseno"),
-    (["ACTUACION", "TEATRAL", "ARTES VISUALES", "ARTES MUSICAL", "MUSICA", "ARTE", "CINE"], "arte"),
+    (["ACTUACION", "TEATRAL", "TEATRO", "ARTES VISUALES", "ARTES MUSICAL", "MUSICA", "ARTE", "CINE",
+      "DANZA", "ANIMACION", "AUDIOVISUAL", "ILUSTRACION", "FOTOGRAFIA", "OFICIOS CREATIVOS",
+      "DIBUJANTE", "MULTIMEDIA", "CREACION"], "arte"),
+    # — Humanidades / Idiomas —
+    (["TRADUCCION", "INTERPRETACION", "INTERPRETE", "LINGUISTICA", "LITERATURA", "LETRAS",
+      "FILOSOFIA", "TEOLOGIA", "HUMANIDADES", "IDIOMAS", "INGLES", "HISPANIC"], "humanidades"),
+    # — Agro / Ciencias —
     (["AGRONOM"], "agronomia"),
-    (["ADMINISTRACION", "INGENIERIA EN ADMINISTRACION", "CONTROL DE GESTION"], "ing_comercial"),
-    (["BIOQUIMICA", "BIOLOGIA", "QUIMICA", "FISICA", "MATEMATICA", "ASTRONOM",
-      "BACHILLERATO EN CIENCIAS", "LICENCIATURA EN CIENCIAS"], "ciencias"),
-    (["TRABAJO SOC", "ANTROPOLOG", "HISTORIA", "GEOGRAFIA", "CIENCIA POLITICA",
-      "BACHILLERATO EN CIENCIAS SOCIALES"], "psicologia"),
+    (["TECNOLOGIA EN", "TECNOLOGO EN", "AUTOMATIZACION", "MANTENIMIENTO INDUSTRIAL",
+      "PROCESOS PRODUCTIVOS"], "ing_ejecucion"),
+    (["BIOQUIMICA", "BIOLOGIA", "QUIMICA", "QUIMICO", "ANALISTA QUIMICO", "FISICA", "MATEMATICA",
+      "ASTRONOM", "BIOTECNOLOG", "ECOLOGIA", "ESTADISTICA", "CIENCIA DE DATOS",
+      "BACHILLERATO EN CIENCIAS", "LICENCIATURA EN CIENCIAS", "BACHILLER EN CIENCIAS"], "ciencias"),
 ]
 
 
