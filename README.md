@@ -21,6 +21,10 @@ Las probabilidades están **calibradas**: "60%" significa ~60% real. El valor de
 la **incertidumbre cuando el alumno está cerca del corte** (que se mueve ~±24 pts/año) y dar una
 estimación temprana **antes de la PAES**.
 
+Además, una tercera pestaña estima el **retorno económico** de la carrera (empleabilidad, ingreso mediano,
+arancel y punto de equilibrio de la inversión) con cifras referenciales agregadas del **SIES (mifuturo.cl)**,
+respondiendo a la parte de la visión del producto sobre *ingresos futuros y otras amenidades*.
+
 ---
 
 ## Cómo ejecutar
@@ -50,7 +54,8 @@ scripts/
   03_analisis_determinantes.py  Análisis formal: brechas por origen + OLS + figuras (informe)
 src/
   inference.py            Lógica de predicción (ponderado, encoding, predict) — sin Streamlit
-  app.py                  Dashboard Streamlit (predictor enfocado)
+  finanzas.py             Retorno económico (ROI, empleabilidad, payback) por familia de carrera — SIES
+  app.py                  Dashboard Streamlit (acceso PRE/POST-PAES + retorno económico)
 models/                   modelo_acceso_{pre,post}.joblib + *_meta.json
 data/
   raw/                    Archivos DEMRE (ArchivoC/D 2025 y 2026, oferta, libros de códigos)
