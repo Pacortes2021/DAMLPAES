@@ -46,6 +46,8 @@ streamlit run src/app.py        # o:  python3 -m streamlit run src/app.py
 scripts/
   00_build_dataset.py     ETL limpio → dataset_modelo_acceso.parquet, carrera_stats.json, catalogo, labels
   01_build_models.py      Entrenamiento + validación temporal + calibración → models/*.joblib
+  02_build_score_model.py Predicción de puntaje PAES por prueba (regresión por cuantiles)
+  03_analisis_determinantes.py  Análisis formal: brechas por origen + OLS + figuras (informe)
 src/
   inference.py            Lógica de predicción (ponderado, encoding, predict) — sin Streamlit
   app.py                  Dashboard Streamlit (predictor enfocado)
@@ -54,6 +56,7 @@ data/
   raw/                    Archivos DEMRE (ArchivoC/D 2025 y 2026, oferta, libros de códigos)
   processed/              Datasets y artefactos generados por el ETL
 docs/METODOLOGIA.md       Decisiones de diseño y validación
+docs/ANALISIS_DETERMINANTES.md  Hallazgos: cómo el origen condiciona el puntaje y el acceso
 reports/figures/          Figuras (EDA + curvas de calibración)
 notebooks/                EDA exploratorio
 legacy/                   Código/modelos previos archivados (referencia)

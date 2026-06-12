@@ -1,10 +1,12 @@
-# DAML 2026 · Grupo 5 — dependencias (versiones probadas)
-polars>=1.36
-pandas>=2.3
-numpy>=2.0
-scikit-learn>=1.6
-joblib>=1.3
-matplotlib>=3.8
-plotly>=6.0
-streamlit>=1.50
-openpyxl>=3.1        # lectura de libros de códigos .xlsx
+# DAML 2026 · Grupo 5 — dependencias
+# Dashboard (src/app.py)
+pandas
+numpy
+scikit-learn
+joblib
+plotly
+streamlit
+# Scripts y notebooks (scripts/, notebooks/)
+polars
+matplotlib
+openpyxl
