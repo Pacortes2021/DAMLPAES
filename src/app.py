@@ -415,6 +415,36 @@ Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · G
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 1 · CARRERA (página principal)
+@st.dialog("📖 Cómo usar este dashboard", width="large")
+def mostrar_tutorial():
+    pasos = [
+        ("1 · Elige tu carrera", "En la **barra lateral** (izquierda ⬅️) elige la **carrera** y la **universidad** "
+         "que te interesan. Escribe para buscar; los nombres están en MAYÚSCULAS."),
+        ("2 · Completa tu perfil", "Más abajo en la barra lateral, ingresa tus **notas** (NEM y ranking) y de **dónde "
+         "vienes** (región, comuna, colegio). Si ya rendiste la PAES, agrega tus **puntajes**."),
+        ("3 · Mira tu resultado", "En **🎯 Mi resultado** verás tu **probabilidad de acceso**, tu **ponderado vs el "
+         "corte** y **cuánto te falta**. Puedes descargar el resumen."),
+        ("4 · Explora", "Arriba cambias de modo: **📋 La carrera** (ponderaciones, titulación, cortes), "
+         "**🔎 ¿Dónde quedo?** (dónde tienes chance), **⚖️ Comparar** y **🗺️ Mapa**."),
+    ]
+    paso = st.session_state.get("tut_paso", 0)
+    titulo, texto = pasos[paso]
+    st.markdown(f"### {titulo}")
+    st.markdown(texto)
+    st.progress((paso + 1) / len(pasos))
+    b1, _, b3 = st.columns([1, 2, 1])
+    if paso > 0 and b1.button("← Atrás", use_container_width=True):
+        st.session_state["tut_paso"] = paso - 1; st.rerun()
+    if paso < len(pasos) - 1:
+        if b3.button("Siguiente →", use_container_width=True, type="primary"):
+            st.session_state["tut_paso"] = paso + 1; st.rerun()
+    elif b3.button("¡Listo! 🎉", use_container_width=True, type="primary"):
+        st.session_state["tutorial"] = False; st.session_state["tut_paso"] = 0; st.rerun()
+
+
+if "tutorial" not in st.session_state:           # se muestra automáticamente la primera vez
+    st.session_state["tutorial"] = True
+
 cat = art.catalogo.copy()
 cat["reg_nom"] = cat["REGION_CASA_MATRIZ"].astype("Int64").astype(str).map(L["region"]).fillna("")
 # normalización a MAYÚSCULAS SIN TILDES: unifica "Ingeniería"/"INGENIERIA"/"INGENIERÍA"
@@ -428,149 +458,78 @@ cat["comp_label"] = (cat["NOMBRE_CARRERA"].fillna("¿?").str.title() + " — " +
                      + " · " + cat["reg_nom"] + " (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
 cat_idx = cat.set_index("CODIGO_CARRERA")
 
-st.markdown("<div class='sec'><h3>1 · Elige la carrera y la universidad</h3></div>", unsafe_allow_html=True)
-sc1, sc2 = st.columns(2)
-with sc1:
+# ----------------------------------------------------------------- INPUTS (barra lateral)
+with st.sidebar:
+    st.markdown(f"<div style='font-weight:800;color:{AZUL_OSC};font-size:1.1rem'>🎓 Tus datos</div>", unsafe_allow_html=True)
+    if st.button("📖 Tutorial · cómo usar", use_container_width=True):
+        st.session_state["tutorial"] = True; st.session_state["tut_paso"] = 0; st.rerun()
+    st.markdown("**1 · Tu carrera**")
     carreras = sorted(cat["CARRERA_U"].unique())
     idx0 = carreras.index("ARQUITECTURA") if "ARQUITECTURA" in carreras else 0
     carrera_sel = st.selectbox("Carrera (escribe para buscar)", carreras, index=idx0)
-with sc2:
     subset = cat[cat["CARRERA_U"] == carrera_sel].sort_values("univ_display")
-    uni_sel = st.selectbox(f"Universidad que la imparte · {len(subset)} opción(es)",
-                           subset["univ_display"].tolist())
+    uni_sel = st.selectbox(f"Universidad · {len(subset)} opción(es)", subset["univ_display"].tolist())
+    st.markdown("**2 · Tu perfil**")
+    if st.radio("Notas", ["Puntaje NEM", "Promedio de notas"], horizontal=True, label_visibility="collapsed", key="m_nem") == "Puntaje NEM":
+        nem = st.number_input("Puntaje NEM (100–1000)", 100, 1000, 650, 5); promedio = None
+    else:
+        promedio = st.number_input("Promedio de notas (1.0–7.0)", 1.0, 7.0, 6.0, 0.1); nem = None
+    if st.radio("Ranking", ["Puntaje Ranking", "% superior del curso"], horizontal=True, label_visibility="collapsed", key="m_rk") == "Puntaje Ranking":
+        ranking = st.number_input("Puntaje Ranking (100–1000)", 100, 1000, 680, 5); porc_sup = None
+    else:
+        porc_sup = st.number_input("% superior del curso (menor = mejor)", 1, 100, 30, 1); ranking = None
+    region = st.selectbox("Región", opt(L["region"]), format_func=lambda k: L["region"].get(k, k),
+                          index=opt(L["region"]).index("13") if "13" in L["region"] else 0)
+    comunas_reg = [c for c in opt(L["comuna"]) if L["comuna_region"].get(c) == region] or opt(L["comuna"])
+    comuna = st.selectbox("Comuna", comunas_reg, format_func=lambda k: L["comuna"].get(k, k))
+    dependencia = st.selectbox("Dependencia del colegio", opt(L["dependencia"]), format_func=lambda k: L["dependencia"].get(k, k))
+    rama = st.selectbox("Rama educacional", opt(L["rama"]), format_func=lambda k: L["rama"].get(k, k))
+    st.markdown("**3 · Tus puntajes PAES** · *si ya rendiste*")
+    s_clec = st.number_input("C. Lectora", 0, 1000, 0, 5, key="s_clec", help="Déjalo en 0 si aún no rindes")
+    s_mate1 = st.number_input("Matemática M1", 0, 1000, 0, 5, key="s_mate1")
+    s_mate2 = st.number_input("Matem. M2", 0, 1000, 0, 5, key="s_mate2")
+    s_hcsoc = st.number_input("Historia", 0, 1000, 0, 5, key="s_hcsoc")
+    s_cien = st.number_input("Ciencias", 0, 1000, 0, 5, key="s_cien")
+
 row = subset[subset["univ_display"] == uni_sel].iloc[0]
 cod = int(row["CODIGO_CARRERA"])
 st_info = art.stats.get(str(cod))
-
-cL, cR = st.columns([1, 1])
-with cL:
-    corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
-    cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
-    _vac = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
-    v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
-    vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
-    vac_total = v1 + v2 + vac_esp          # todas las vías de admisión (regular + especiales)
-    vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
-    st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
-                f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron 2025</div></div>"
-                f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
-                unsafe_allow_html=True)
-    desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
-        + ([f"{int(vac_esp)} (admisión especial: PACE/otros)"] if vac_esp > 0 else [])
-    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}"
-               + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
-    if st_info is None:
-        st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
-                    unsafe_allow_html=True)
-    mtr = art.matricula.get(str(cod))
-    historia = historia_carrera(mtr, v2, vac_total, vac_esp) if mtr else ""
-    if historia:
-        st.markdown(historia, unsafe_allow_html=True)
-    st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
-                "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (se cuenta el mejor)</span></div>"
-                + ponderaciones_html(row), unsafe_allow_html=True)
-with cR:
-    st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
-    _ch = art.cortes_hist.get(str(cod))
-    if _ch:
-        _ftrend = fig_corte_trend(_ch)
-        if _ftrend is not None:
-            st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
-
-# titulación (contexto SIES 2024): total (carrera o área) + tu universidad, con tabla y tortas
-_tnorm = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
-_tt = art.titulacion.get("por_carrera", {}).get(_tnorm) if _tnorm else None
-_tlabel = "Todas las universidades"
-if not _tt:
-    _tarea = area_de(carrera_sel)
-    _tt = art.titulacion.get("por_area", {}).get(_tarea)
-    _tlabel = f"Tu área: {_tarea}" if _tarea else None
-_tu = art.titulacion.get("por_carrera_inst", {}).get(_tnorm, {}).get(str(row["UNIV_U"])) if _tt else None
-if _tt and _tlabel:
-    st.markdown("<div class='sec'><h3>🎓 Titulación de la carrera (SIES 2024)</h3></div>", unsafe_allow_html=True)
-    _filas = [tit_fila(_tlabel, _tt)] + ([tit_fila(str(row["UNIV_U"]).title(), _tu)] if _tu else [])
-    st.dataframe(pd.DataFrame(_filas), hide_index=True, width="stretch", column_config={
-        "Titulados": st.column_config.NumberColumn(format="%d"),
-        "% Mujeres": st.column_config.NumberColumn(format="%.0f%%"),
-        "% Hombres": st.column_config.NumberColumn(format="%.0f%%"),
-        "Edad prom.": st.column_config.NumberColumn(format="%.0f años", help="Promedio (lo infla la cola de titulados mayores)"),
-        "Edad mediana": st.column_config.NumberColumn(format="%.0f años", help="Más representativa: la mitad se titula antes de esta edad")})
-    _pcols = st.columns(2 if _tu else 1)
-    _pcols[0].plotly_chart(fig_pie_genero(_tt, _tlabel), use_container_width=True, key="pie_tot")
-    if _tu:
-        _pcols[1].plotly_chart(fig_pie_genero(_tu, str(row["UNIV_U"]).title()), use_container_width=True, key="pie_uni")
-    st.caption("💡 La **mediana** de edad es más representativa que el promedio (la cola de titulados mayores "
-               "infla el promedio). Cifras agregadas nacionales del SIES; "
-               + ("incluye solo tu universidad cuando hay match de nombre." if _tu else
-                  "no se encontró tu universidad específica en los datos de esta carrera."))
-
-# ----------------------------------------------------------------- 2 · PERFIL (página principal)
-st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
-with st.container(border=True):
-    p1, p2 = st.columns(2)
-    with p1:
-        st.markdown("**📘 Rendimiento de Enseñanza Media**")
-        if st.radio("Notas", ["Puntaje NEM", "Promedio de notas"], horizontal=True,
-                    label_visibility="collapsed", key="m_nem") == "Puntaje NEM":
-            nem = st.number_input("Puntaje NEM (100–1000)", 100, 1000, 650, 5); promedio = None
-        else:
-            promedio = st.number_input("Promedio de notas (1.0–7.0)", 1.0, 7.0, 6.0, 0.1); nem = None
-        if st.radio("Ranking", ["Puntaje Ranking", "% superior del curso"], horizontal=True,
-                    label_visibility="collapsed", key="m_rk") == "Puntaje Ranking":
-            ranking = st.number_input("Puntaje Ranking (100–1000)", 100, 1000, 680, 5); porc_sup = None
-        else:
-            porc_sup = st.number_input("% superior del curso (menor = mejor; ej. 5 = top 5%)", 1, 100, 30, 1); ranking = None
-    with p2:
-        st.markdown("**🏫 Contexto del establecimiento**")
-        region = st.selectbox("Región", opt(L["region"]), format_func=lambda k: L["region"].get(k, k),
-                              index=opt(L["region"]).index("13") if "13" in L["region"] else 0)
-        # comuna en cascada: solo comunas de la región elegida
-        comunas_reg = [c for c in opt(L["comuna"]) if L["comuna_region"].get(c) == region]
-        if not comunas_reg:
-            comunas_reg = opt(L["comuna"])
-        comuna = st.selectbox("Comuna", comunas_reg, format_func=lambda k: L["comuna"].get(k, k))
-        dependencia = st.selectbox("Dependencia del colegio", opt(L["dependencia"]),
-                                   format_func=lambda k: L["dependencia"].get(k, k))
-        rama = st.selectbox("Rama educacional", opt(L["rama"]), format_func=lambda k: L["rama"].get(k, k))
-
-# tasa histórica de acceso por territorio (contexto; robustez si la comuna tiene pocos datos)
-tr_reg = art.territorio["region"].get(str(region))
-tr_com = art.territorio["comuna"].get(str(comuna))
-if tr_reg:
-    reg_txt = f"<b>{L['region'].get(region, region)}: {tr_reg['tasa']:.0%}</b> (n={tr_reg['n']:,})"
-    if tr_com:
-        pocos = tr_com["n"] < 100
-        com_txt = (f"Comuna {L['comuna'].get(comuna, comuna)}: <b>{tr_com['tasa']:.0%}</b> (n={tr_com['n']:,})"
-                   + (" ⚠️ pocos datos, considera la regional" if pocos else ""))
-    else:
-        com_txt = f"Comuna {L['comuna'].get(comuna, comuna)}: sin datos suficientes → usa la regional"
-    st.markdown(f"<div class='nota'>📍 <b>Tasa histórica de acceso a 1ª preferencia</b> (todas las carreras) — "
-                f"{reg_txt} · {com_txt}</div>", unsafe_allow_html=True)
-
 perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=promedio, porc_sup=porc_sup,
                      region=region, comuna=comuna, dependencia=dependencia, rama=rama)
+es_post = s_clec >= 100 and s_mate1 >= 100
+perfil_post = replace(perfil_base, clec=s_clec if s_clec >= 100 else None, mate1=s_mate1 if s_mate1 >= 100 else None,
+                      mate2=s_mate2 if s_mate2 >= 100 else None, hcsoc=s_hcsoc if s_hcsoc >= 100 else None,
+                      cien=s_cien if s_cien >= 100 else None)
+perfil_exp = perfil_post if es_post else perfil_base      # para los modos de exploración
+modo_modelo = "post" if es_post else "pre"
+_vac = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
+v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
+vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
+vac_total = v1 + v2 + vac_esp
 
-# ----------------------------------------------------------------- VEREDICTO unificado
-st.markdown("<div class='sec'><h3>🧭 Tu veredicto (antes de la PAES)</h3></div>", unsafe_allow_html=True)
-_vres = predecir(art, perfil_base)
-_vbanda = predecir_puntaje(art, perfil_base)
+if st.session_state.get("tutorial"):
+    mostrar_tutorial()
 
+# ----------------------------------------------------------------- modo: MI RESULTADO
+def render_resultado():
+    _vres = predecir(art, perfil_base)
+    _vbanda = predecir_puntaje(art, perfil_base)
 
-def _ver_escenario(q):
-    pp = replace(perfil_base, clec=_vbanda["CLEC"][q], mate1=_vbanda["MATE1"][q],
-                 mate2=_vbanda.get("MATE2", {}).get(q), hcsoc=_vbanda.get("HCSOC", {}).get(q),
-                 cien=_vbanda.get("CIEN", {}).get(q))
-    r = predecir(art, pp)
-    return r["ponderado"], r["p_post"]
+    def _esc(q):
+        pp = replace(perfil_base, clec=_vbanda["CLEC"][q], mate1=_vbanda["MATE1"][q],
+                     mate2=_vbanda.get("MATE2", {}).get(q), hcsoc=_vbanda.get("HCSOC", {}).get(q),
+                     cien=_vbanda.get("CIEN", {}).get(q))
+        r = predecir(art, pp)
+        return r["ponderado"], r["p_post"]
 
-
-if _vres["p_pre"] is None:
-    st.info("Completa **NEM/notas y ranking/%superior** en la sección 2 para ver tu veredicto.")
-else:
+    if _vres["p_pre"] is None:
+        st.info("Completa **NEM/notas y ranking** en la barra lateral ⬅️ para ver tu resultado.")
+        return
+    st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
     _ppre = _vres["p_pre"]
-    _pond50, _ = _ver_escenario("p50")
-    _, _plo = _ver_escenario("p10")
-    _, _phi = _ver_escenario("p90")
+    _pond50, _ = _esc("p50")
+    _, _plo = _esc("p10")
+    _, _phi = _esc("p90")
     _corte = _vres["corte"]
     _gap = (_corte - _pond50) if (_corte and _pond50 is not None) else None
     vc1, vc2 = st.columns([1, 1.35])
@@ -586,15 +545,13 @@ else:
         if _gap is not None and _gap > 0:
             st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado estimado (~{_pond50:.0f}) está "
                         f"<b>{_gap:.0f} pts bajo el corte</b> ({_corte:.0f}) → necesitarías subir <b>~{_gap:.0f} pts "
-                        f"en cada prueba</b> para quedar en la línea.</div>", unsafe_allow_html=True)
+                        f"en cada prueba</b>.</div>", unsafe_allow_html=True)
         elif _gap is not None:
             st.markdown(f"<div class='nota'>✅ <b>Vas bien:</b> tu ponderado estimado (~{_pond50:.0f}) <b>supera el corte</b> "
                         f"({_corte:.0f}) por ~{-_gap:.0f} pts. Igual depende de cómo rindas.</div>", unsafe_allow_html=True)
         if _plo is not None and _phi is not None:
-            st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> si rindes <b>bajo</b> (P10) tu probabilidad sería "
-                        f"~<b>{_plo:.0%}</b>; si rindes <b>alto</b> (P90), ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>",
-                        unsafe_allow_html=True)
-    # resumen exportable
+            st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> bajo (P10) ~<b>{_plo:.0%}</b>; "
+                        f"alto (P90) ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>", unsafe_allow_html=True)
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
     _lineas = [f"MI RESULTADO — {carrera_sel.title()} · {str(row['UNIV_U']).title()}",
@@ -607,119 +564,100 @@ else:
         _lineas.append(f"Rango de probabilidad según PAES: {_plo:.0%} (bajo) a {_phi:.0%} (alto)")
     if _tq:
         _lineas.append(f"Titulación: {_tq['pct_muj']:.0f}% mujeres · edad mediana {_tq['edad_mediana']:.0f} años")
-    _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía de admisión."]
-    st.download_button("📄 Descargar mi resumen", data="\n".join(_lineas),
-                       file_name="mi_resultado_PAES.txt", key="dl_resumen")
+    _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía."]
+    st.download_button("📄 Descargar mi resumen", data="\n".join(_lineas), file_name="mi_resultado_PAES.txt", key="dl_resumen")
 
-# ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
-st.markdown("<div class='sec'><h3>3 · Resultados (detalle)</h3></div>", unsafe_allow_html=True)
-tab1, tab2, tab3, tab_comp, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
-                                            "🔎 ¿Dónde puedo quedar?", "⚖️ Comparar carreras",
-                                            "🗺️ Mapa territorial"])
-
-with tab1:
-    st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
-               "que obtengas, y con eso tu probabilidad de acceso.")
-    res = predecir(art, perfil_base)
-    banda = predecir_puntaje(art, perfil_base)
-    c1, c2 = st.columns([1, 1.25])
-    with c1:
-        if res["p_pre"] is not None:
-            st.plotly_chart(gauge(res["p_pre"], "Probabilidad de acceso (PRE-PAES)"), use_container_width=True, key="g_pre")
-        else:
-            st.info("Completa NEM/notas y ranking/%superior.")
-    with c2:
-        st.plotly_chart(fig_bandas(banda), use_container_width=True, key="bandas")
-        st.caption("📊 **Cómo leer la banda:** de cada 100 estudiantes con tu mismo perfil (notas + contexto), "
-                   "**80 sacan un puntaje dentro de la banda**; el punto central es la mediana (la mitad saca más, "
-                   "la mitad menos). El extremo izquierdo (P10) es un escenario bajo y el derecho (P90) uno alto. "
-                   "La banda es ancha porque el puntaje no está determinado por tu perfil — el origen lo *desplaza*, no lo fija. "
-                   "Las pruebas electivas se muestran como referencia *si las rindes*.")
-
-    st.markdown("<div class='sec'><h3>🔬 El efecto del origen (mismas notas, distinto colegio)</h3></div>",
-                unsafe_allow_html=True)
-    cfp = cf_dependencia(perfil_base, "pre")
-    if cfp:
-        st.plotly_chart(fig_cf(cfp, "Probabilidad de acceso según tipo de colegio — mismo perfil académico", AZUL),
-                        use_container_width=True, key="cf_pre")
-        gap = (max(cfp.values()) - min(cfp.values())) * 100
-        st.markdown(f"<div class='nota'>Con <b>las mismas notas</b>, cambiar el tipo de colegio mueve la probabilidad "
-                    f"<b>~{gap:.0f} pts porcentuales</b>: el contexto predice el puntaje que probablemente obtendrás "
-                    f"→ <b>determinante estructural del éxito</b>.</div>", unsafe_allow_html=True)
-
-with tab2:
-    st.caption("Estimación **con tus puntajes reales**: aquí decide el puntaje vs el corte; el origen deja de importar.")
-    with st.container(border=True):
-        st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: Lectora y Matemática M1")
-        q1, q2, q3, q4, q5 = st.columns(5)
-        clec = q1.number_input("C. Lectora", 100, 1000, 650, 5)
-        mate1 = q2.number_input("Matemática M1", 100, 1000, 650, 5)
-        mate2 = q3.number_input("Matem. M2", 0, 1000, 0, 5, help="0 si no rendiste")
-        hcsoc = q4.number_input("Historia", 0, 1000, 0, 5, help="0 si no rendiste")
-        cien = q5.number_input("Ciencias", 0, 1000, 0, 5, help="0 si no rendiste")
-    perfil_post = replace(perfil_base, clec=clec, mate1=mate1,
-                          mate2=mate2 if mate2 >= 100 else None, hcsoc=hcsoc if hcsoc >= 100 else None,
-                          cien=cien if cien >= 100 else None)
-    res2 = predecir(art, perfil_post)
-
-    c1, c2 = st.columns([1, 1.25])
-    with c1:
+    if es_post:                                            # resultado con puntajes PAES reales
+        res2 = predecir(art, perfil_post)
         if res2["p_post"] is not None:
-            st.plotly_chart(gauge(res2["p_post"], "Probabilidad de acceso (POST-PAES)"), use_container_width=True, key="g_post")
-        else:
-            st.info("Ingresa al menos C. Lectora y Matemática M1.")
-    with c2:
-        if res2["ponderado"] is not None and res2["corte"] is not None:
-            st.markdown("<br>", unsafe_allow_html=True)
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Tu ponderado", f"{res2['ponderado']:.0f}")
-            m2.metric("Corte 2025", f"{res2['corte']:.0f}")
-            m3.metric("Margen", f"{res2['margen']:+.0f}", delta=f"{res2['margen']:+.0f}")
-        st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_post")
-    if res2.get("prueba_especial"):
-        st.markdown("<div class='warn'>🎭 Carrera con <b>prueba especial</b>: el ponderado es aproximado.</div>",
-                    unsafe_allow_html=True)
+            st.markdown("<div class='sec'><h3>✅ Con tus puntajes reales</h3></div>", unsafe_allow_html=True)
+            pc1, pc2 = st.columns([1, 1.2])
+            pc1.plotly_chart(gauge(res2["p_post"], "Probabilidad (POST-PAES)"), use_container_width=True, key="res_gpost")
+            with pc2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                pm = st.columns(3)
+                pm[0].metric("Tu ponderado", f"{res2['ponderado']:.0f}" if res2['ponderado'] else "s/d")
+                pm[1].metric("Corte 2025", f"{res2['corte']:.0f}" if res2['corte'] else "s/d")
+                if res2['margen'] is not None and res2['margen'] == res2['margen']:
+                    pm[2].metric("Margen", f"{res2['margen']:+.0f}", delta=f"{res2['margen']:+.0f}")
 
-    st.markdown("<div class='sec'><h3>🔬 Con tu puntaje, ¿importa el origen?</h3></div>", unsafe_allow_html=True)
-    cfp2 = cf_dependencia(perfil_post, "post")
-    if cfp2:
-        st.plotly_chart(fig_cf(cfp2, "Probabilidad según tipo de colegio — con TUS puntajes fijos", "#16a34a"),
-                        use_container_width=True, key="cf_post")
-        gap2 = (max(cfp2.values()) - min(cfp2.values())) * 100
-        st.markdown(f"<div class='nota'>Con tus puntajes puestos, cambiar el colegio mueve la probabilidad solo "
-                    f"<b>~{gap2:.1f} pts</b> (≈0). <b>El puntaje ya lo explica todo.</b> El origen importaba antes "
-                    f"porque actuaba <i>a través</i> del puntaje: <b>origen → puntaje → acceso</b>.</div>",
+    with st.expander("🔬 Ver detalle: tu puntaje PAES probable y el efecto del origen"):
+        st.plotly_chart(fig_bandas(_vbanda), use_container_width=True, key="bandas")
+        st.caption("De cada 100 estudiantes con tu perfil, ~80 sacan un puntaje dentro de la banda; el punto es la mediana.")
+        cfp = cf_dependencia(perfil_base, "pre")
+        if cfp:
+            st.plotly_chart(fig_cf(cfp, "Probabilidad según tipo de colegio — mismo perfil académico", AZUL),
+                            use_container_width=True, key="cf_pre")
+            gap = (max(cfp.values()) - min(cfp.values())) * 100
+            st.markdown(f"<div class='nota'>Con <b>las mismas notas</b>, cambiar el colegio mueve la probabilidad "
+                        f"<b>~{gap:.0f} pts</b>: el contexto predice el puntaje → <b>determinante estructural</b>.</div>",
+                        unsafe_allow_html=True)
+tab_res, tab_car, tab3, tab_comp, tab4 = st.tabs(
+    ["🎯 Mi resultado", "📋 La carrera", "🔎 ¿Dónde quedo?", "⚖️ Comparar", "🗺️ Mapa"])
+
+with tab_res:
+    render_resultado()
+
+with tab_car:
+    st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
+    cL, cR = st.columns([1, 1])
+    with cL:
+        corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
+        cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
+        vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
+        st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
+                    f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron 2025</div></div>"
+                    f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                     unsafe_allow_html=True)
+        desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
+            + ([f"{int(vac_esp)} (admisión especial: PACE/otros)"] if vac_esp > 0 else [])
+        st.caption(f"📍 {row['reg_nom']} · código {cod}"
+                   + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
+        if st_info is None:
+            st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
+                        unsafe_allow_html=True)
+        mtr = art.matricula.get(str(cod))
+        historia = historia_carrera(mtr, v2, vac_total, vac_esp) if mtr else ""
+        if historia:
+            st.markdown(historia, unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
+                    "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (cuenta el mejor)</span></div>"
+                    + ponderaciones_html(row), unsafe_allow_html=True)
+    with cR:
+        st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
+        _ch = art.cortes_hist.get(str(cod))
+        if _ch:
+            _ftrend = fig_corte_trend(_ch)
+            if _ftrend is not None:
+                st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
+    _tnorm = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
+    _tt = art.titulacion.get("por_carrera", {}).get(_tnorm) if _tnorm else None
+    _tlabel = "Todas las universidades"
+    if not _tt:
+        _tarea = area_de(carrera_sel)
+        _tt = art.titulacion.get("por_area", {}).get(_tarea)
+        _tlabel = f"Tu área: {_tarea}" if _tarea else None
+    _tu = art.titulacion.get("por_carrera_inst", {}).get(_tnorm, {}).get(str(row["UNIV_U"])) if _tt else None
+    if _tt and _tlabel:
+        st.markdown("<div class='sec'><h3>🎓 Titulación de la carrera (SIES 2024)</h3></div>", unsafe_allow_html=True)
+        _filas = [tit_fila(_tlabel, _tt)] + ([tit_fila(str(row["UNIV_U"]).title(), _tu)] if _tu else [])
+        st.dataframe(pd.DataFrame(_filas), hide_index=True, width="stretch", column_config={
+            "Titulados": st.column_config.NumberColumn(format="%d"),
+            "% Mujeres": st.column_config.NumberColumn(format="%.0f%%"),
+            "% Hombres": st.column_config.NumberColumn(format="%.0f%%"),
+            "Edad prom.": st.column_config.NumberColumn(format="%.0f años", help="Promedio (lo infla la cola de titulados mayores)"),
+            "Edad mediana": st.column_config.NumberColumn(format="%.0f años", help="Más representativa")})
+        _pcols = st.columns(2 if _tu else 1)
+        _pcols[0].plotly_chart(fig_pie_genero(_tt, _tlabel), use_container_width=True, key="pie_tot")
+        if _tu:
+            _pcols[1].plotly_chart(fig_pie_genero(_tu, str(row["UNIV_U"]).title()), use_container_width=True, key="pie_uni")
+        st.caption("💡 La **mediana** es más representativa que el promedio (la cola de titulados mayores lo infla). SIES, agregado nacional.")
 
 with tab3:
     st.caption("Te muestro **dónde tienes más chance de quedar**: la misma carrera en todas las "
-               "universidades, y **carreras afines de tu área** (no te ofrezco cosas de otra área). "
-               "Probabilidades de acceso **calibradas**.")
-    modo_paes = st.radio("¿Ya rendiste la PAES?",
-                         ["✅ Sí — con mis puntajes (más preciso)", "🔮 Todavía no — con mis notas (PRE-PAES)"],
-                         horizontal=True, key="r_modo")
-    es_post = modo_paes.startswith("✅")
-
-    if es_post:
-        with st.container(border=True):
-            st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: C. Lectora y Matemática M1")
-            rc = st.columns(5)
-            r_clec = rc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="r_clec")
-            r_mate1 = rc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="r_mate1")
-            r_mate2 = rc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="r_mate2", help="0 si no rendiste")
-            r_hcsoc = rc[3].number_input("Historia", 0, 1000, 0, 5, key="r_hcsoc", help="0 si no rendiste")
-            r_cien = rc[4].number_input("Ciencias", 0, 1000, 0, 5, key="r_cien", help="0 si no rendiste")
-        perfil_rec = replace(perfil_base, clec=r_clec, mate1=r_mate1,
-                             mate2=r_mate2 if r_mate2 >= 100 else None,
-                             hcsoc=r_hcsoc if r_hcsoc >= 100 else None,
-                             cien=r_cien if r_cien >= 100 else None)
-        modo_modelo = "post"
-    else:
-        st.info("🔮 Estimación **antes de la PAES**: usa las **notas y el contexto** de la sección 2 (arriba). "
-                "Es más incierta — el puntaje real puede mover bastante el resultado.")
-        perfil_rec = perfil_base
-        modo_modelo = "pre"
-
+               "universidades, y **carreras afines de tu área**. Probabilidades **calibradas**. "
+               + ("Usando tus **puntajes PAES**." if es_post else "Usando tus **notas** (antes de la PAES; más incierto)."))
+    perfil_rec = perfil_exp
     o1, o2 = st.columns([2, 1])
     orden = o1.radio("Ordenar por", ["🏅 Lo mejor que alcanzo", "🎯 Más probable"], horizontal=True, key="r_orden")
     modo_orden = "alcanzo" if orden.startswith("🏅") else "prob"
@@ -757,24 +695,10 @@ with tab_comp:
                "probabilidad de acceso, corte, tu margen, vacantes, matrícula efectiva y ponderaciones.")
     sel_comp = st.multiselect("Programas a comparar (elige 2 o 3)", cat["comp_label"].tolist(),
                               default=[row["comp_label"]], max_selections=3, key="comp_sel")
-    cm = st.radio("¿Ya rendiste la PAES?", ["✅ Sí — con mis puntajes", "🔮 Todavía no — con mis notas"],
-                  horizontal=True, key="comp_modo")
-    c_post = cm.startswith("✅")
-    if c_post:
-        with st.container(border=True):
-            cc = st.columns(5)
-            cc_clec = cc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="c_clec")
-            cc_mate1 = cc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="c_mate1")
-            cc_mate2 = cc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="c_mate2", help="0 si no rendiste")
-            cc_hcsoc = cc[3].number_input("Historia", 0, 1000, 0, 5, key="c_hcsoc", help="0 si no rendiste")
-            cc_cien = cc[4].number_input("Ciencias", 0, 1000, 0, 5, key="c_cien", help="0 si no rendiste")
-        perfil_comp = replace(perfil_base, clec=cc_clec, mate1=cc_mate1,
-                              mate2=cc_mate2 if cc_mate2 >= 100 else None,
-                              hcsoc=cc_hcsoc if cc_hcsoc >= 100 else None,
-                              cien=cc_cien if cc_cien >= 100 else None)
-    else:
-        st.caption("🔮 Usando tus **notas y contexto** de la sección 2 (estimación antes de la PAES).")
-        perfil_comp = perfil_base
+    st.caption("Con tus **puntajes PAES** de la barra lateral." if es_post
+               else "🔮 Con tus **notas** de la barra lateral (antes de la PAES).")
+    c_post = es_post
+    perfil_comp = perfil_exp
 
     if len(sel_comp) < 2:
         st.info("Elige al menos **2 programas** para comparar (puedes buscar otras carreras/universidades en el selector de arriba).")
