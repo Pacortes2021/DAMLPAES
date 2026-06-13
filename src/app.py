@@ -161,7 +161,9 @@ def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
         fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers",
             marker=dict(size=11, color="#dc2626", line=dict(width=2, color="white")),
             hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
-    fig.update_geos(fitbounds="locations", visible=False, bgcolor="rgba(0,0,0,0)")
+    # encuadre fijo a Chile CONTINENTAL (excluye Isla de Pascua ~-109° y la Antártica, que distorsionan)
+    fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
+                    lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
     fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
     return fig
 
