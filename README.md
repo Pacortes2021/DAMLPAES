@@ -14,8 +14,8 @@ Dos modelos calibrados (Gradient Boosting), para los dos momentos de decisión d
 
 | Modelo | Cuándo | Entradas | AUC (validación temporal 2025→2026) |
 |---|---|---|---|
-| **PRE-PAES** | Antes de rendir | NEM, ranking, notas, comuna, dependencia, dificultad de la carrera | **0.914** |
-| **POST-PAES** | Con el puntaje ya conocido | + puntajes PAES + margen al corte histórico | **0.975** |
+| **PRE-PAES** | Antes de rendir | NEM, ranking, notas, comuna, dependencia, dificultad de la carrera | **0.898** |
+| **POST-PAES** | Con el puntaje ya conocido | + puntajes PAES + margen al corte histórico | **0.978** |
 
 Las probabilidades están **calibradas**: "60%" significa ~60% real. El valor de la herramienta es estimar
 la **incertidumbre cuando el alumno está cerca del corte** (que se mueve ~±24 pts/año) y dar una
@@ -27,6 +27,9 @@ estimación temprana **antes de la PAES**.
 
 ```bash
 pip install -r requirements.txt
+
+# 0. Reconstruye la capa de preferencias desde los ArchivoD crudos (trazable, sin filtrado oculto)
+python3 scripts/00a_build_master_admision.py
 
 # 1. ETL: construye la tabla de modelado (cohortes 2025+2026) + catálogo + etiquetas
 python3 scripts/00_build_dataset.py

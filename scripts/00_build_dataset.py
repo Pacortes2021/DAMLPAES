@@ -29,7 +29,7 @@ ARCHIVO_C = {
     2025: P("data/raw/PROCESO-DE-ADMISIÓN-2025-RENDICIÓN-19-01-2025T23-39-20/ArchivoC_Adm2025.csv"),
     2026: P("data/raw/ArchivoC_Adm2026REG.csv"),
 }
-MASTER = P("data/processed/master_admision_2018_2026.parquet")
+MASTER = P("data/processed/master_admision.parquet")   # reconstruido desde crudos por 00a (trazable)
 OFERTA = P("data/raw/OfertaAcadémica_Admisión2026.csv")
 
 PAES = ["CLEC", "MATE1", "MATE2", "HCSOC", "CIEN"]          # pruebas (se coalescen 3 fuentes)

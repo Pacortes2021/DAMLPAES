@@ -81,12 +81,16 @@ Lo anterior **más**:
 
 | Modelo | AUC-ROC | PR-AUC | Brier (calibrado) |
 |---|---|---|---|
-| PRE-PAES | 0.914 | 0.890 | 0.117 |
-| POST-PAES | 0.975 | 0.967 | 0.064 |
+| PRE-PAES | 0.898 | 0.846 | 0.126 |
+| POST-PAES | 0.978 | 0.966 | 0.060 |
 
-La caída respecto a un split aleatorio es pequeña (POST: 0.990→0.975), lo que evidencia **generalización
-real** a una cohorte futura. Los cortes son estables año a año (corr 2024-25 = 0.90; 2025-26 = 0.91);
-su movimiento mediano (±24 pts) es la incertidumbre que la probabilidad calibrada captura.
+> Métricas regeneradas con el **master reconstruido desde los ArchivoD crudos** (ver §6). Cambian
+> mínimamente respecto a la versión previa (PRE 0.914→0.898, POST 0.975→0.978): el modelo es robusto
+> y los números anteriores no estaban inflados por el filtrado no documentado del master antiguo.
+
+La caída respecto a un split aleatorio es pequeña, lo que evidencia **generalización
+real** a una cohorte futura. Los cortes son estables año a año; su movimiento mediano (±24 pts) es la
+incertidumbre que la probabilidad calibrada captura.
 
 ---
 
@@ -102,21 +106,26 @@ su movimiento mediano (±24 pts) es la incertidumbre que la probabilidad calibra
 
 ## 6. Procedencia de los datos y pipeline
 
-**Entradas (crudas / validadas):**
+**Entradas (todas crudas del DEMRE, descargadas del portal de transparencia):**
+- `data/raw/.../ArchivoD_Adm{2024,2025,2026}.csv` — postulaciones (preferencias, estado, ponderado).
 - `data/raw/.../ArchivoC_Adm2025.csv` + `data/raw/ArchivoC_Adm2026REG.csv` — perfil académico individual
   por cohorte (NEM, ranking, PAES, notas, comuna). Mismo esquema en ambos años.
-- `data/processed/master_admision_2018_2026.parquet` — capa de preferencias/estados (validada).
 - `data/raw/OfertaAcadémica_Admisión2026.csv` — catálogo de carreras (nombres, universidad, vacantes).
+- `data/raw/Libro_CódigosADM2026_ArchivoC.xlsx` — libro de códigos (etiquetas región/comuna/dependencia/rama).
 
-**Pipeline (reproducible):**
-1. `scripts/00_build_dataset.py` → `data/processed/dataset_modelo_acceso.parquet` (cohortes 2025+2026),
-   `carrera_stats.json` (corte + cupos por carrera) y `catalogo_carreras.parquet`.
-2. `scripts/01_build_models.py` → `models/modelo_acceso_{pre,post}.joblib` + `*_meta.json` +
-   `reports/figures/calibracion_{pre,post}.png`.
-3. `scripts/02_build_score_model.py` → `models/modelo_puntaje_q{10,50,90}.joblib` (nivel PAES por cuantiles).
+**Pipeline (100% reproducible desde los crudos):**
+0. `scripts/00a_build_master_admision.py` → `master_admision.parquet`. **Reconstruye la capa de
+   preferencias/estados concatenando los ArchivoD crudos 1:1, sin filtrado oculto** (reemplaza el master
+   antiguo que se hizo fuera del repo, sin script y con ~8% de no-seleccionados filtrados sin documentar).
+1. `scripts/00_build_dataset.py` → `dataset_modelo_acceso.parquet` (cohortes 2025+2026),
+   `carrera_stats.json` (corte + cupos) y `catalogo_carreras.parquet`. Todo el filtrado (1ª pref, REGULAR,
+   join con perfil académico) ocurre aquí, explícito.
+2. `scripts/01_build_models.py` → `models/modelo_acceso_{pre,post}.joblib` + `*_meta.json` + curvas de calibración.
+3. `scripts/02_build_score_model.py` → `models/modelo_puntaje_*.joblib` (puntaje PAES por cuantiles).
+4. `scripts/04_matricula_stats.py` → `matricula_stats.json` (matrícula efectiva, cruce admisión↔matrícula).
 
-> El código superado (3 scripts de entrenamiento inconsistentes, modelos y dashboards previos) quedó
-> archivado en `legacy/` para referencia.
+> **Trazabilidad (para la defensa):** cada fila del master viene 1:1 de un ArchivoD del DEMRE. Verificamos
+> que los cortes y conteos de seleccionados coinciden con los crudos. El código previo quedó en `legacy/`.
 
 ---
 
