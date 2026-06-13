@@ -136,6 +136,32 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def vac_total_de(row) -> float:
+    """Vacantes 2026 totales (regular 1er+2º sem + admisión especial PACE/CDP/género)."""
+    g = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
+    return g("VACANTES_1SEM") + g("VACANTES_2SEM") + g("CAR_VACANTES_PACE") + g("CDP_VACANTES_ESPECIALES") + g("VACANTES_GENERO")
+
+
+def fig_radar_multi(rows, labels):
+    """Radar que superpone las ponderaciones de 2-3 carreras para compararlas."""
+    cats = [n for n, _ in PESOS]
+    palette = [AZUL, "#16a34a", "#f59e0b"]
+    fig = go.Figure()
+    mx = 0
+    for i, (r, lab) in enumerate(zip(rows, labels)):
+        vals = [float(r[c]) if r[c] == r[c] else 0.0 for _, c in PESOS]
+        mx = max(mx, max(vals))
+        fig.add_trace(go.Scatterpolar(r=vals + [vals[0]], theta=cats + [cats[0]], fill="toself",
+            name=lab[:26], line=dict(color=palette[i % len(palette)], width=2), opacity=.5,
+            hovertemplate="%{theta}: %{r:.0f}%<extra></extra>"))
+    fig.update_layout(height=400, margin=dict(l=40, r=40, t=44, b=46),
+        title=dict(text="⚖️ Ponderaciones comparadas", font=dict(size=14, color=AZUL_OSC)),
+        polar=dict(radialaxis=dict(range=[0, mx * 1.15 if mx else 40], ticksuffix="%", tickfont=dict(size=9)),
+                   angularaxis=dict(tickfont=dict(size=10, color=AZUL_OSC))),
+        legend=dict(orientation="h", y=-0.12, font=dict(size=10)), paper_bgcolor="white")
+    return fig
+
+
 def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
     """Coroplético de Chile por tasa de acceso (región) + tu región resaltada + tu comuna marcada."""
     codes = [f["properties"]["codregion"] for f in geo["features"]]
@@ -322,6 +348,8 @@ cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").str.upper().str.strip()
 cat["univ_display"] = (cat["UNIV_U"] + " · " + cat["reg_nom"].str.upper()
                        + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
 cat["area"] = cat["CARRERA_U"].map(area_de)
+cat["comp_label"] = (cat["NOMBRE_CARRERA"].fillna("¿?").str.title() + " — " + cat["UNIV_U"].str.title()
+                     + " · " + cat["reg_nom"] + " (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
 cat_idx = cat.set_index("CODIGO_CARRERA")
 
 st.markdown("<div class='sec'><h3>1 · Elige la carrera y la universidad</h3></div>", unsafe_allow_html=True)
@@ -416,8 +444,9 @@ perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=p
 
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
 st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
-tab1, tab2, tab3, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
-                                  "🔎 ¿Dónde puedo quedar?", "🗺️ Mapa territorial"])
+tab1, tab2, tab3, tab_comp, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
+                                            "🔎 ¿Dónde puedo quedar?", "⚖️ Comparar carreras",
+                                            "🗺️ Mapa territorial"])
 
 with tab1:
     st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
@@ -553,6 +582,59 @@ with tab3:
         st.caption("No pude clasificar el área de esta carrera; muestro solo la misma carrera en otras universidades.")
     st.caption("🏅 *Lo mejor que alcanzo* = entre las que tienes ≥50% de probabilidad, ordenadas de más a menos "
                "selectiva. 🆕 = carrera nueva (sin corte histórico). La tabla es ordenable por cualquier columna.")
+
+with tab_comp:
+    st.caption("Compara **2 o 3 programas** lado a lado para decidir entre tus finalistas: "
+               "probabilidad de acceso, corte, tu margen, vacantes, matrícula efectiva y ponderaciones.")
+    sel_comp = st.multiselect("Programas a comparar (elige 2 o 3)", cat["comp_label"].tolist(),
+                              default=[row["comp_label"]], max_selections=3, key="comp_sel")
+    cm = st.radio("¿Ya rendiste la PAES?", ["✅ Sí — con mis puntajes", "🔮 Todavía no — con mis notas"],
+                  horizontal=True, key="comp_modo")
+    c_post = cm.startswith("✅")
+    if c_post:
+        with st.container(border=True):
+            cc = st.columns(5)
+            cc_clec = cc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="c_clec")
+            cc_mate1 = cc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="c_mate1")
+            cc_mate2 = cc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="c_mate2", help="0 si no rendiste")
+            cc_hcsoc = cc[3].number_input("Historia", 0, 1000, 0, 5, key="c_hcsoc", help="0 si no rendiste")
+            cc_cien = cc[4].number_input("Ciencias", 0, 1000, 0, 5, key="c_cien", help="0 si no rendiste")
+        perfil_comp = replace(perfil_base, clec=cc_clec, mate1=cc_mate1,
+                              mate2=cc_mate2 if cc_mate2 >= 100 else None,
+                              hcsoc=cc_hcsoc if cc_hcsoc >= 100 else None,
+                              cien=cc_cien if cc_cien >= 100 else None)
+    else:
+        st.caption("🔮 Usando tus **notas y contexto** de la sección 2 (estimación antes de la PAES).")
+        perfil_comp = perfil_base
+
+    if len(sel_comp) < 2:
+        st.info("Elige al menos **2 programas** para comparar (puedes buscar otras carreras/universidades en el selector de arriba).")
+    else:
+        cols = st.columns(len(sel_comp))
+        rows_comp = []
+        for col, disp in zip(cols, sel_comp):
+            rc = cat[cat["comp_label"] == disp].iloc[0]
+            rows_comp.append(rc)
+            codc = int(rc["CODIGO_CARRERA"])
+            res = predecir(art, replace(perfil_comp, cod_carrera=codc))
+            p = res["p_post"] if c_post else res["p_pre"]
+            with col:
+                st.markdown(f"<div style='min-height:48px'><b style='color:#1e3a8a'>{str(rc['NOMBRE_CARRERA']).title()}</b><br>"
+                            f"<span style='color:#64748b;font-size:.82rem'>{str(rc['UNIV_U']).title()}</span></div>", unsafe_allow_html=True)
+                if p is not None:
+                    st.plotly_chart(gauge(p, "Prob. de acceso"), use_container_width=True, key=f"cg_{codc}")
+                else:
+                    st.info("Faltan datos para estimar.")
+                st.metric("Corte 2025", f"{res['corte']:.0f}" if res["corte"] else "s/d")
+                if c_post and res["margen"] is not None and res["margen"] == res["margen"]:
+                    st.metric("Tu margen", f"{res['margen']:+.0f}")
+                st.metric("Vacantes 2026", f"{int(vac_total_de(rc))}" if vac_total_de(rc) else "s/d")
+                mtr_c = art.matricula.get(str(codc))
+                if mtr_c and mtr_c.get("tasa") is not None:
+                    st.metric("Matríc. efectiva", f"{mtr_c['tasa']:.0%}")
+                st.caption(f"📍 {rc['reg_nom']} · {rc['area'] or 'área s/c'}")
+        st.plotly_chart(fig_radar_multi(rows_comp, [str(r["UNIV_U"]).title() for r in rows_comp]),
+                        use_container_width=True, key="comp_radar")
 
 with tab4:
     st.caption("**Tasa histórica de acceso a 1ª preferencia** por territorio (todas las carreras, "
