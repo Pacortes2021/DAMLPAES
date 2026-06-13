@@ -39,12 +39,13 @@ mat["COD_CARRERA"] = mat["COD_CARRERA"].astype(int)
 matric_ids = mat.groupby("COD_CARRERA")["ID_aux"].apply(set)
 matric_total = mat.groupby("COD_CARRERA")["ID_aux"].nunique()
 
-# seleccionados en 1ª preferencia por carrera
+# postulantes y seleccionados en 1ª preferencia por carrera
+postula = adm.groupby("COD_CARRERA_PREF")["ID_aux"].nunique()          # pusieron la carrera como 1ª pref
 sel = adm[adm.ACCESO_1PREF == 1]
 sel_ids = sel.groupby("COD_CARRERA_PREF")["ID_aux"].apply(set)
 
 stats = {}
-codigos = set(matric_total.index) | set(sel_ids.index)
+codigos = set(matric_total.index) | set(sel_ids.index) | set(postula.index)
 for cod in codigos:
     s = sel_ids.get(cod, set())
     m = matric_ids.get(cod, set())
@@ -52,6 +53,7 @@ for cod in codigos:
     n_sel_matric = len(s & m)
     stats[str(cod)] = {
         "anio": ANIO,
+        "n_postula": int(postula.get(cod, 0)),
         "n_sel": n_sel,
         "n_sel_matric": n_sel_matric,
         "tasa": round(n_sel_matric / n_sel, 4) if n_sel else None,

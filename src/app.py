@@ -123,6 +123,42 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def historia_carrera(mtr: dict, v2: float, vac_total: float) -> str:
+    """Narrativa en lenguaje natural del embudo de la carrera (postulan → quedan → se matriculan
+    → total), año 2026. Devuelve HTML (.nota) o '' si no hay datos suficientes."""
+    if not mtr:
+        return ""
+    np_ = mtr.get("n_postula", 0) or 0
+    ns = mtr.get("n_sel", 0) or 0
+    nsm = mtr.get("n_sel_matric", 0) or 0
+    tasa = mtr.get("tasa")
+    ntot = mtr.get("n_matric_total", 0) or 0
+    anio = mtr.get("anio", 2026)
+    m = lambda n: f"{int(n):,}".replace(",", ".")   # miles a la chilena, solo en números
+    partes = []
+    if np_ > 0 and ns > 0:
+        partes.append(f"De los <b>{m(np_)}</b> estudiantes que la pusieron como <b>1ª preferencia</b> en {anio}, "
+                      f"quedaron seleccionados <b>{m(ns)}</b> (<b>{ns/np_:.0%}</b> de los postulantes)")
+    elif ns > 0:
+        partes.append(f"En {anio} quedaron seleccionados <b>{m(ns)}</b> en 1ª preferencia")
+    if ns > 0 and tasa is not None:
+        partes.append(f"de ellos, el <b>{tasa:.0%}</b> se matriculó en esta carrera")
+    if ntot > 0:
+        ctx = ""
+        if ntot > nsm:
+            ctx = " (sumando a quienes entraron por otras preferencias" + (" y en 2º semestre" if v2 > 0 else "") + ")"
+        cola = f"en total la carrera matriculó a <b>{m(ntot)}</b> personas{ctx}"
+        if vac_total > 0:
+            cola += f", sobre <b>{m(vac_total)}</b> vacantes"
+        partes.append(cola)
+    if not partes:
+        return ""
+    texto = "; ".join(partes) + "."
+    texto = texto[0].upper() + texto[1:]
+    poco = " <span style='color:#94a3b8;font-size:.85em'>· pocos casos, dato referencial</span>" if 0 < ns < 20 else ""
+    return f"<div class='nota'>📖 <b>La historia de esta carrera ({anio}):</b> {texto}{poco}</div>"
+
+
 def ponderaciones_html(row):
     """Fila de chips con la ponderación (%) de cada prueba. Obligatorias (Notas, Ranking,
     C. Lectora, Matem. M1) resaltadas. Historia y Ciencias son electivos ALTERNATIVOS:
@@ -210,11 +246,9 @@ with cL:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
     mtr = art.matricula.get(str(cod))
-    if mtr and mtr.get("tasa") is not None and mtr["n_sel"] > 0:
-        poco = " <i>(pocos casos, referencial)</i>" if mtr["n_sel"] < 20 else ""
-        st.markdown(f"<div class='nota'>📋 <b>Matrícula efectiva {mtr['anio']}:</b> de los <b>{mtr['n_sel']}</b> "
-                    f"seleccionados en 1ª preferencia, el <b>{mtr['tasa']:.0%}</b> se matriculó en esta carrera. "
-                    f"Matriculados totales: <b>{mtr['n_matric_total']}</b>.{poco}</div>", unsafe_allow_html=True)
+    historia = historia_carrera(mtr, v2, vac_total) if mtr else ""
+    if historia:
+        st.markdown(historia, unsafe_allow_html=True)
     st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
                 "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (se cuenta el mejor)</span></div>"
                 + ponderaciones_html(row), unsafe_allow_html=True)
