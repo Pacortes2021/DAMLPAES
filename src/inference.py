@@ -7,7 +7,7 @@ PRE-PAES / POST-PAES con los modelos calibrados. Reusable y testeable.
 """
 from __future__ import annotations
 import os, json, joblib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import numpy as np
 import pandas as pd
 
@@ -142,8 +142,17 @@ def ponderado(perfil: Perfil, carrera_row: pd.Series) -> tuple[float | None, boo
     return num / w_acad, prueba_especial
 
 
-def _row(perfil: Perfil, meta: dict) -> pd.DataFrame:
-    """Construye la fila de features en el orden que espera el modelo (num + cat)."""
+def _num(v):
+    """Coerción escalar a float (NaN si no es numérico). Equivale a pd.to_numeric(errors='coerce')."""
+    try:
+        f = float(v)
+        return f if f == f else np.nan
+    except (TypeError, ValueError):
+        return np.nan
+
+
+def _fila(perfil: Perfil, meta: dict) -> dict:
+    """Diccionario de features (num + cat ya codificadas) para una postulación."""
     num, cat, maps = meta["features_num"], meta["features_cat"], meta["cat_mappings"]
     st = perfil._stats
     val = {
@@ -160,13 +169,17 @@ def _row(perfil: Perfil, meta: dict) -> pd.DataFrame:
         "GRUPO_DEPENDENCIA": perfil.dependencia, "CODIGO_REGION": perfil.region,
         "CODIGO_COMUNA": perfil.comuna, "RAMA_EDUCACIONAL": perfil.rama,
     }
-    fila = {}
-    for c in num:
-        fila[c] = pd.to_numeric(pd.Series([val.get(c)]), errors="coerce").iloc[0]
+    fila = {c: _num(val.get(c)) for c in num}
     for c in cat:
         m = maps[c]
         fila[c] = m.get(str(val.get(c)), m.get("__OTRAS__"))
-    X = pd.DataFrame([fila])[num + cat]
+    return fila
+
+
+def _row(perfil: Perfil, meta: dict) -> pd.DataFrame:
+    """Construye la fila de features (DataFrame de 1 fila) en el orden que espera el modelo."""
+    num, cat = meta["features_num"], meta["features_cat"]
+    X = pd.DataFrame([_fila(perfil, meta)])[num + cat]
     for c in cat:
         X[c] = X[c].astype("int32")
     return X
@@ -230,3 +243,47 @@ def predecir_puntaje(art: Artifacts, perfil: Perfil) -> dict:
     # nivel agregado = promedio de las medianas (resumen)
     out["nivel"] = {k: (out["CLEC"][k] + out["MATE1"][k]) / 2 for k in ("p10", "p50", "p90")}
     return out
+
+
+def rankear(art: Artifacts, perfil_base: Perfil, codigos, modo: str = "post") -> list[dict]:
+    """Ordena una lista de carreras candidatas por probabilidad de acceso para el perfil dado.
+
+    Para cada código calcula el ponderado del alumno con las ponderaciones de ESA carrera
+    (y su margen al corte) y predice P(acceso) en un solo batch. Devuelve dicts con
+    {cod, p, ponderado, corte, margen, cupos, carrera_nueva} ordenados por p descendente.
+    `modo`: "post" (usa puntajes PAES) o "pre" (solo notas + contexto).
+    """
+    completar_equivalencias(perfil_base, art.conv)
+    meta = art.meta_post if modo == "post" else art.meta_pre
+    model = art.post if modo == "post" else art.pre
+    num, cat = meta["features_num"], meta["features_cat"]
+    cat_idx = art.catalogo.set_index("CODIGO_CARRERA")
+    filas, info = [], []
+    for cod in codigos:
+        cod = int(cod)
+        if cod not in cat_idx.index:
+            continue
+        carrera_row = cat_idx.loc[cod]
+        if isinstance(carrera_row, pd.DataFrame):       # código duplicado (defensivo): 1ª fila
+            carrera_row = carrera_row.iloc[0]
+        st = art.stats.get(str(cod))
+        p = replace(perfil_base, cod_carrera=cod)
+        p._stats = st
+        pond, _ = ponderado(p, carrera_row)
+        corte = st["corte"] if st else None
+        p._ptje = pond
+        p._margen = (pond - corte) if (pond is not None and corte is not None) else np.nan
+        filas.append(_fila(p, meta))
+        info.append({"cod": cod, "ponderado": pond, "corte": corte,
+                     "margen": (None if p._margen != p._margen else float(p._margen)),
+                     "cupos": st["cupos"] if st else None, "carrera_nueva": st is None})
+    if not filas:
+        return []
+    X = pd.DataFrame(filas)[num + cat]
+    for c in cat:
+        X[c] = X[c].astype("int32")
+    probs = model.predict_proba(X)[:, 1]
+    for d, pr in zip(info, probs):
+        d["p"] = float(pr)
+    info.sort(key=lambda d: d["p"], reverse=True)
+    return info

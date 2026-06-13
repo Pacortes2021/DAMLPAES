@@ -9,9 +9,11 @@ Ejecutar:  python3 -m streamlit run src/app.py
 """
 from __future__ import annotations
 from dataclasses import replace
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from inference import load_artifacts, Perfil, predecir, predecir_puntaje
+from inference import load_artifacts, Perfil, predecir, predecir_puntaje, rankear
+from areas import area_de
 
 st.set_page_config(page_title="¿Quedo en mi 1ª preferencia?", page_icon="🎓", layout="wide")
 AZUL, AZUL_OSC = "#2563eb", "#1e3a8a"
@@ -123,6 +125,34 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def tabla_rank(rows, idx, incluir_carrera: bool, n: int = 15) -> pd.DataFrame:
+    """DataFrame para st.dataframe a partir del ranking (P desc, luego corte desc)."""
+    rr = sorted(rows, key=lambda d: (d["p"], d["corte"] or 0), reverse=True)[:n]
+    data = []
+    for d in rr:
+        c = idx.loc[d["cod"]]
+        fila = {}
+        if incluir_carrera:
+            fila["Carrera"] = str(c["NOMBRE_CARRERA"]).title()
+        fila["Universidad"] = str(c["NOMBRE_UNIVERSIDAD"]).title()
+        fila["Región"] = str(c["reg_nom"])
+        fila["P(acceso)"] = d["p"] * 100
+        fila["Corte 2025"] = d["corte"]
+        fila["Tu margen"] = d["margen"]
+        data.append(fila)
+    return pd.DataFrame(data)
+
+
+def mostrar_tabla(df: pd.DataFrame):
+    st.dataframe(df, hide_index=True, use_container_width=True, column_config={
+        "P(acceso)": st.column_config.ProgressColumn("Prob. acceso", min_value=0, max_value=100,
+                                                     format="%.0f%%", help="Probabilidad calibrada (POST-PAES)"),
+        "Corte 2025": st.column_config.NumberColumn("Corte 2025", format="%.0f"),
+        "Tu margen": st.column_config.NumberColumn("Tu margen", format="%+.0f",
+                                                   help="Tu ponderado menos el corte del año previo"),
+    })
+
+
 def historia_carrera(mtr: dict, v2: float, vac_total: float, vac_esp: float = 0.0) -> str:
     """Narrativa en lenguaje natural del embudo de la carrera (postulan → quedan → se matriculan
     → total), año 2026. Devuelve HTML (.nota) o '' si no hay datos suficientes."""
@@ -214,6 +244,8 @@ cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").str.upper().str.strip()
 # desambiguación de universidad: universidad · región (cód) — cada opción mapea a UN código
 cat["univ_display"] = (cat["UNIV_U"] + " · " + cat["reg_nom"].str.upper()
                        + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
+cat["area"] = cat["CARRERA_U"].map(area_de)
+cat_idx = cat.set_index("CODIGO_CARRERA")
 
 st.markdown("<div class='sec'><h3>1 · Elige la carrera y la universidad</h3></div>", unsafe_allow_html=True)
 sc1, sc2 = st.columns(2)
@@ -307,7 +339,7 @@ perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=p
 
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
 st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
-tab1, tab2 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES"])
+tab1, tab2, tab3 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES", "🔎 ¿Dónde puedo quedar?"])
 
 with tab1:
     st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
@@ -382,6 +414,51 @@ with tab2:
                     f"<b>~{gap2:.1f} pts</b> (≈0). <b>El puntaje ya lo explica todo.</b> El origen importaba antes "
                     f"porque actuaba <i>a través</i> del puntaje: <b>origen → puntaje → acceso</b>.</div>",
                     unsafe_allow_html=True)
+
+with tab3:
+    st.caption("Con tus puntajes te muestro **dónde tienes más chance de quedar**: la misma carrera en "
+               "todas las universidades, y **carreras afines de tu área** (no te ofrezco cosas de otra área). "
+               "Ordenado por probabilidad de acceso **calibrada**.")
+    with st.container(border=True):
+        st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: C. Lectora y Matemática M1")
+        rc = st.columns(5)
+        r_clec = rc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="r_clec")
+        r_mate1 = rc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="r_mate1")
+        r_mate2 = rc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="r_mate2", help="0 si no rendiste")
+        r_hcsoc = rc[3].number_input("Historia", 0, 1000, 0, 5, key="r_hcsoc", help="0 si no rendiste")
+        r_cien = rc[4].number_input("Ciencias", 0, 1000, 0, 5, key="r_cien", help="0 si no rendiste")
+    solo_reg = st.checkbox(f"Mostrar solo en mi región ({L['region'].get(region, region)})", value=False, key="r_reg")
+
+    perfil_rec = replace(perfil_base, clec=r_clec, mate1=r_mate1,
+                         mate2=r_mate2 if r_mate2 >= 100 else None,
+                         hcsoc=r_hcsoc if r_hcsoc >= 100 else None,
+                         cien=r_cien if r_cien >= 100 else None)
+    area_sel = area_de(carrera_sel)
+    sub_misma = cat[cat["CARRERA_U"] == carrera_sel]
+    sub_area = cat[(cat["area"] == area_sel) & (cat["CARRERA_U"] != carrera_sel)] if area_sel else cat.iloc[0:0]
+    if solo_reg:
+        rint = int(region)
+        sub_misma = sub_misma[sub_misma["REGION_CASA_MATRIZ"].astype("Int64") == rint]
+        sub_area = sub_area[sub_area["REGION_CASA_MATRIZ"].astype("Int64") == rint]
+
+    st.markdown(f"<div class='sec'><h3>📍 {carrera_sel.title()} — dónde tienes más chance</h3></div>", unsafe_allow_html=True)
+    r_misma = rankear(art, perfil_rec, sub_misma["CODIGO_CARRERA"].tolist(), "post")
+    if r_misma:
+        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False))
+    else:
+        st.info("No hay universidades para mostrar con ese filtro.")
+
+    if area_sel:
+        st.markdown(f"<div class='sec'><h3>🧭 Otras carreras de tu área: {area_sel}</h3></div>", unsafe_allow_html=True)
+        r_area = rankear(art, perfil_rec, sub_area["CODIGO_CARRERA"].tolist(), "post")
+        if r_area:
+            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True))
+            st.caption("Top 15 por probabilidad. El área se asigna según el nombre de la carrera; "
+                       "el margen usa el corte del año previo (las carreras sin corte histórico se omiten del cálculo de margen).")
+        else:
+            st.info("No hay carreras afines para mostrar con ese filtro.")
+    else:
+        st.caption("No pude clasificar el área de esta carrera, así que muestro solo la misma carrera en otras universidades.")
 
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
