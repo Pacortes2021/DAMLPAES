@@ -105,8 +105,13 @@ def cortes_y_cupos(master: pl.DataFrame, anio_previo: int) -> pl.DataFrame:
 
 def build_cohorte(master: pl.DataFrame, anio: int) -> pl.DataFrame:
     """Tabla de modelado para la cohorte `anio`: 1ª preferencia REGULAR + perfil + dificultad carrera."""
+    # Población del modelo = postulaciones VÁLIDAMENTE RANKEADAS en 1ª pref regular:
+    #   ESTADO_PREF 24 (seleccionado, target=1) vs 25 (lista de espera, target=0).
+    # Se excluyen los estados sin ponderado (no evaluados / no cumplen requisitos), que no
+    # compitieron de verdad. Filtro EXPLÍCITO aquí (antes venía oculto en el master antiguo).
     pref = (
-        master.filter((pl.col("anio") == anio) & (pl.col("ORDEN_PREF") == 1) & (pl.col("TIPO_PREF") == "REGULAR"))
+        master.filter((pl.col("anio") == anio) & (pl.col("ORDEN_PREF") == 1)
+                      & (pl.col("TIPO_PREF") == "REGULAR") & (pl.col("ESTADO_PREF").is_in([24, 25])))
         .select(
             "ID_aux", "COD_CARRERA_PREF", "PTJE_PREF",
             (pl.col("ESTADO_PREF") == 24).cast(pl.Int8).alias("ACCESO_1PREF"),

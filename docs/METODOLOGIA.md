@@ -81,12 +81,13 @@ Lo anterior **más**:
 
 | Modelo | AUC-ROC | PR-AUC | Brier (calibrado) |
 |---|---|---|---|
-| PRE-PAES | 0.898 | 0.846 | 0.126 |
-| POST-PAES | 0.978 | 0.966 | 0.060 |
+| PRE-PAES | 0.914 | 0.890 | 0.117 |
+| POST-PAES | 0.975 | 0.967 | 0.064 |
 
-> Métricas regeneradas con el **master reconstruido desde los ArchivoD crudos** (ver §6). Cambian
-> mínimamente respecto a la versión previa (PRE 0.914→0.898, POST 0.975→0.978): el modelo es robusto
-> y los números anteriores no estaban inflados por el filtrado no documentado del master antiguo.
+> Métricas regeneradas con el **pipeline 100% reproducible desde los ArchivoD crudos** (ver §6), con el
+> filtro de población (`ESTADO_PREF ∈ {24,25}`: seleccionado vs lista de espera) **explícito en el script**.
+> Coinciden exactamente con la metodología documentada → el modelo es trazable y reproducible de punta a
+> punta (el master antiguo aplicaba ese mismo filtro, pero oculto y sin script).
 
 La caída respecto a un split aleatorio es pequeña, lo que evidencia **generalización
 real** a una cohorte futura. Los cortes son estables año a año; su movimiento mediano (±24 pts) es la
