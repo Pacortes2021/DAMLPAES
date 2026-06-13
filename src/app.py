@@ -9,9 +9,12 @@ Ejecutar:  python3 -m streamlit run src/app.py
 """
 from __future__ import annotations
 from dataclasses import replace
+import json, os
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from inference import load_artifacts, Perfil, predecir, predecir_puntaje
+from inference import load_artifacts, Perfil, predecir, predecir_puntaje, rankear
+from areas import area_de, _norm
 
 st.set_page_config(page_title="¿Quedo en mi 1ª preferencia?", page_icon="🎓", layout="wide")
 AZUL, AZUL_OSC = "#2563eb", "#1e3a8a"
@@ -44,6 +47,16 @@ st.markdown(f"""
   .stTabs [aria-selected="true"] {{color:{AZUL}!important;}}
 </style>
 """, unsafe_allow_html=True)
+
+
+_GEO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "geo")
+
+
+@st.cache_data
+def get_geo():
+    geo = json.load(open(os.path.join(_GEO, "regiones.geojson")))
+    cent = json.load(open(os.path.join(_GEO, "comuna_centroides.json")))
+    return geo, cent
 
 
 @st.cache_resource
@@ -123,6 +136,183 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def fig_corte_trend(hist: dict):
+    """Mini-línea con el corte de la carrera en 2024–2026 (tendencia). None si <2 años."""
+    yrs = [y for y in ("2024", "2025", "2026") if hist.get(y) is not None]
+    vals = [hist[y] for y in yrs]
+    if len(vals) < 2:
+        return None
+    delta = vals[-1] - vals[0]
+    col = "#16a34a" if delta < -3 else "#dc2626" if delta > 3 else AZUL   # bajó=más fácil, subió=más difícil
+    fig = go.Figure(go.Scatter(x=yrs, y=vals, mode="lines+markers+text",
+        text=[f"{v:.0f}" for v in vals], textposition="top center", textfont=dict(size=11, color=AZUL_OSC),
+        line=dict(color=col, width=3), marker=dict(size=9, color=col)))
+    fig.update_layout(height=200, margin=dict(l=10, r=14, t=42, b=6),
+        title=dict(text=f"📈 Corte de la carrera · {delta:+.0f} pts en 3 años", font=dict(size=13, color=AZUL_OSC)),
+        yaxis=dict(title="Corte (ponderado)", showgrid=True, gridcolor="#eef"),
+        xaxis=dict(showgrid=False), plot_bgcolor="white", paper_bgcolor="white",
+        yaxis_range=[min(vals) - 25, max(vals) + 30])
+    return fig
+
+
+def vac_total_de(row) -> float:
+    """Vacantes 2026 totales (regular 1er+2º sem + admisión especial PACE/CDP/género)."""
+    g = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
+    return g("VACANTES_1SEM") + g("VACANTES_2SEM") + g("CAR_VACANTES_PACE") + g("CDP_VACANTES_ESPECIALES") + g("VACANTES_GENERO")
+
+
+def fig_radar_multi(rows, labels):
+    """Radar que superpone las ponderaciones de 2-3 carreras para compararlas."""
+    cats = [n for n, _ in PESOS]
+    palette = [AZUL, "#16a34a", "#f59e0b"]
+    fig = go.Figure()
+    mx = 0
+    for i, (r, lab) in enumerate(zip(rows, labels)):
+        vals = [float(r[c]) if r[c] == r[c] else 0.0 for _, c in PESOS]
+        mx = max(mx, max(vals))
+        fig.add_trace(go.Scatterpolar(r=vals + [vals[0]], theta=cats + [cats[0]], fill="toself",
+            name=lab[:26], line=dict(color=palette[i % len(palette)], width=2), opacity=.5,
+            hovertemplate="%{theta}: %{r:.0f}%<extra></extra>"))
+    fig.update_layout(height=400, margin=dict(l=40, r=40, t=44, b=46),
+        title=dict(text="⚖️ Ponderaciones comparadas", font=dict(size=14, color=AZUL_OSC)),
+        polar=dict(radialaxis=dict(range=[0, mx * 1.15 if mx else 40], ticksuffix="%", tickfont=dict(size=9)),
+                   angularaxis=dict(tickfont=dict(size=10, color=AZUL_OSC))),
+        legend=dict(orientation="h", y=-0.12, font=dict(size=10)), paper_bgcolor="white")
+    return fig
+
+
+def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
+    """Coroplético de Chile por tasa de acceso (región) + tu región resaltada + tu comuna marcada."""
+    codes = [f["properties"]["codregion"] for f in geo["features"]]
+    z, txt = [], []
+    for c in codes:
+        s = territorio["region"].get(str(c))
+        nom = L["region"].get(str(c), str(c))
+        z.append(s["tasa"] * 100 if s else None)
+        txt.append(f"<b>{nom}</b><br>Acceso 1ª pref: {s['tasa']:.0%}<br>n={s['n']:,}" if s else f"<b>{nom}</b><br>s/d")
+    zz = [v for v in z if v is not None]
+    fig = go.Figure(go.Choropleth(
+        geojson=geo, locations=codes, featureidkey="properties.codregion", z=z,
+        colorscale="Blues", zmin=min(zz), zmax=max(zz), marker_line_color="white", marker_line_width=.5,
+        colorbar=dict(title="% acceso", thickness=12, len=.55, x=.0, xanchor="left"),
+        text=txt, hovertemplate="%{text}<extra></extra>"))
+    if region_sel:                                      # resaltar tu región (borde naranjo)
+        fig.add_trace(go.Choropleth(geojson=geo, locations=[int(region_sel)],
+            featureidkey="properties.codregion", z=[0], showscale=False,
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            marker_line_color="#f59e0b", marker_line_width=3, hoverinfo="skip"))
+    cc = cent.get(str(comuna_sel))                      # marcar tu comuna (punto rojo)
+    if cc:
+        fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers",
+            marker=dict(size=11, color="#dc2626", line=dict(width=2, color="white")),
+            hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
+    # encuadre fijo a Chile CONTINENTAL (excluye Isla de Pascua ~-109° y la Antártica, que distorsionan)
+    fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
+                    lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
+    fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
+    return fig
+
+
+def fig_barras_region(territorio, region_sel, L):
+    """Ranking horizontal de tasa de acceso por región; tu región en naranjo."""
+    items = sorted(((L["region"].get(str(c), str(c)), s["tasa"] * 100, str(c))
+                    for c, s in territorio["region"].items()), key=lambda x: x[1])
+    cols = ["#f59e0b" if c == str(region_sel) else "#bcd4f6" for _, _, c in items]
+    fig = go.Figure(go.Bar(x=[v for _, v, _ in items], y=[n.replace("Region ", "") for n, _, _ in items],
+        orientation="h", marker_color=cols, text=[f"{v:.0f}%" for _, v, _ in items],
+        textposition="outside", textfont=dict(size=10, color=AZUL_OSC)))
+    fig.update_layout(height=640, margin=dict(l=8, r=24, t=30, b=8),
+        title=dict(text="Acceso a 1ª preferencia por región", font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(range=[0, max(v for _, v, _ in items) * 1.18], ticksuffix="%", showgrid=True, gridcolor="#eef"),
+        yaxis=dict(tickfont=dict(size=10)), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
+def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
+               modo_orden: str = "alcanzo", n: int = 15, umbral: float = 0.5) -> pd.DataFrame:
+    """DataFrame para st.dataframe a partir del ranking.
+
+    modo_orden:
+      - "alcanzo": lo MEJOR que alcanzas → entre las que tienes ≥`umbral` de prob., ordena por
+        corte (selectividad) descendente. Si casi ninguna llega al umbral, cae a las más probables.
+      - "prob": las más probables primero (P desc, desempata por corte).
+    Las carreras sin corte histórico (nuevas) se marcan 🆕 y van al final en modo "alcanzo".
+    """
+    # carreras con corte (ranking confiable) primero; las nuevas (🆕) al final, su P es solo orientativa
+    con = [d for d in rows if d["corte"] is not None]
+    sin = sorted([d for d in rows if d["corte"] is None], key=lambda d: d["p"], reverse=True)
+    if modo_orden == "alcanzo":
+        cand = [d for d in con if d["p"] >= umbral]
+        base = (sorted(cand, key=lambda d: d["corte"], reverse=True) if len(cand) >= 3
+                else sorted(con, key=lambda d: d["p"], reverse=True))     # fallback: las más probables
+    else:
+        base = sorted(con, key=lambda d: (d["p"], d["corte"]), reverse=True)
+    rr = (base + sin)[:n]
+    data = []
+    for d in rr:
+        c = idx.loc[d["cod"]]
+        nueva = d["corte"] is None
+        fila = {}
+        if incluir_carrera:
+            fila["Carrera"] = str(c["NOMBRE_CARRERA"]).title()
+        fila["Universidad"] = ("🆕 " if nueva else "") + str(c["NOMBRE_UNIVERSIDAD"]).title()
+        fila["Región"] = str(c["reg_nom"])
+        fila["P(acceso)"] = d["p"] * 100
+        fila["Corte 2025"] = d["corte"]
+        if incluir_margen:
+            fila["Tu margen"] = d["margen"]
+        data.append(fila)
+    return pd.DataFrame(data)
+
+
+def mostrar_tabla(df: pd.DataFrame):
+    st.dataframe(df, hide_index=True, use_container_width=True, column_config={
+        "P(acceso)": st.column_config.ProgressColumn("Prob. acceso", min_value=0, max_value=100,
+                                                     format="%.0f%%", help="Probabilidad calibrada (POST-PAES)"),
+        "Corte 2025": st.column_config.NumberColumn("Corte 2025", format="%.0f"),
+        "Tu margen": st.column_config.NumberColumn("Tu margen", format="%+.0f",
+                                                   help="Tu ponderado menos el corte del año previo"),
+    })
+
+
+def historia_carrera(mtr: dict, v2: float, vac_total: float, vac_esp: float = 0.0) -> str:
+    """Narrativa en lenguaje natural del embudo de la carrera (postulan → quedan → se matriculan
+    → total), año 2026. Devuelve HTML (.nota) o '' si no hay datos suficientes."""
+    if not mtr:
+        return ""
+    np_ = mtr.get("n_postula", 0) or 0
+    ns = mtr.get("n_sel", 0) or 0
+    nsm = mtr.get("n_sel_matric", 0) or 0
+    tasa = mtr.get("tasa")
+    ntot = mtr.get("n_matric_total", 0) or 0
+    anio = mtr.get("anio", 2026)
+    m = lambda n: f"{int(n):,}".replace(",", ".")   # miles a la chilena, solo en números
+    partes = []
+    if np_ > 0 and ns > 0:
+        partes.append(f"De los <b>{m(np_)}</b> estudiantes que la pusieron como <b>1ª preferencia</b> en {anio}, "
+                      f"quedaron seleccionados <b>{m(ns)}</b> (<b>{ns/np_:.0%}</b> de los postulantes)")
+    elif ns > 0:
+        partes.append(f"En {anio} quedaron seleccionados <b>{m(ns)}</b> en 1ª preferencia")
+    if ns > 0 and tasa is not None:
+        partes.append(f"de ellos, el <b>{tasa:.0%}</b> se matriculó en esta carrera")
+    if ntot > 0:
+        ctx = ""
+        if ntot > nsm:
+            extras = ["otras preferencias"] + (["2º semestre"] if v2 > 0 else []) \
+                + (["vías especiales como PACE"] if vac_esp > 0 else [])
+            ctx = " (sumando a quienes entraron por " + ", ".join(extras) + ")"
+        cola = f"en total la carrera matriculó a <b>{m(ntot)}</b> personas{ctx}"
+        if vac_total > 0:
+            cola += f", sobre <b>{m(vac_total)}</b> vacantes en total"
+        partes.append(cola)
+    if not partes:
+        return ""
+    texto = "; ".join(partes) + "."
+    texto = texto[0].upper() + texto[1:]
+    poco = " <span style='color:#94a3b8;font-size:.85em'>· pocos casos, dato referencial</span>" if 0 < ns < 20 else ""
+    return f"<div class='nota'>📖 <b>La historia de esta carrera ({anio}):</b> {texto}{poco}</div>"
+
+
 def ponderaciones_html(row):
     """Fila de chips con la ponderación (%) de cada prueba. Obligatorias (Notas, Ranking,
     C. Lectora, Matem. M1) resaltadas. Historia y Ciencias son electivos ALTERNATIVOS:
@@ -176,6 +366,10 @@ cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").str.upper().str.strip()
 # desambiguación de universidad: universidad · región (cód) — cada opción mapea a UN código
 cat["univ_display"] = (cat["UNIV_U"] + " · " + cat["reg_nom"].str.upper()
                        + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
+cat["area"] = cat["CARRERA_U"].map(area_de)
+cat["comp_label"] = (cat["NOMBRE_CARRERA"].fillna("¿?").str.title() + " — " + cat["UNIV_U"].str.title()
+                     + " · " + cat["reg_nom"] + " (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
+cat_idx = cat.set_index("CODIGO_CARRERA")
 
 st.markdown("<div class='sec'><h3>1 · Elige la carrera y la universidad</h3></div>", unsafe_allow_html=True)
 sc1, sc2 = st.columns(2)
@@ -195,20 +389,53 @@ cL, cR = st.columns([1, 1])
 with cL:
     corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
     cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
-    vac_txt = f"{int(row['VACANTES_1SEM'])}" if row['VACANTES_1SEM'] == row['VACANTES_1SEM'] else "s/d"
+    _vac = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
+    v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
+    vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
+    vac_total = v1 + v2 + vac_esp          # todas las vías de admisión (regular + especiales)
+    vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
     st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
-                f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Sel. 2025</div></div>"
+                f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron 2025</div></div>"
                 f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                 unsafe_allow_html=True)
-    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}")
+    desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
+        + ([f"{int(vac_esp)} (admisión especial: PACE/otros)"] if vac_esp > 0 else [])
+    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}"
+               + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
+    mtr = art.matricula.get(str(cod))
+    historia = historia_carrera(mtr, v2, vac_total, vac_esp) if mtr else ""
+    if historia:
+        st.markdown(historia, unsafe_allow_html=True)
     st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
                 "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (se cuenta el mejor)</span></div>"
                 + ponderaciones_html(row), unsafe_allow_html=True)
 with cR:
     st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
+    _ch = art.cortes_hist.get(str(cod))
+    if _ch:
+        _ftrend = fig_corte_trend(_ch)
+        if _ftrend is not None:
+            st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
+
+# titulación (contexto SIES 2024): match por carrera genérica, con fallback por área
+_tt = art.titulacion.get("por_carrera", {}).get(_norm(carrera_sel))
+_tfuente = f"<b>{carrera_sel.title()}</b>"
+if not _tt:
+    _tarea = area_de(carrera_sel)
+    _tt = art.titulacion.get("por_area", {}).get(_tarea)
+    _tfuente = f"el área <b>{_tarea}</b>" if _tarea else None
+if _tt and _tfuente:
+    _pm = _tt["pct_muj"]
+    _edad = f" · edad promedio de titulación <b>{_tt['edad']:.0f} años</b>" if _tt.get("edad") else ""
+    _gap = " — fuerte predominio <b>femenino</b>" if _pm >= 68 else (" — fuerte predominio <b>masculino</b>" if _pm <= 32 else "")
+    _n = f"{_tt['n']:,}".replace(",", ".")
+    st.markdown(f"<div class='nota'>🎓 <b>Titulación (2024):</b> {_tfuente} tituló a <b>{_n}</b> personas — "
+                f"<b>{_pm:.0f}% mujeres</b> / {100-_pm:.0f}% hombres{_edad}{_gap}. "
+                f"<span style='color:#64748b;font-size:.86em'>(SIES, agregado nacional)</span></div>",
+                unsafe_allow_html=True)
 
 # ----------------------------------------------------------------- 2 · PERFIL (página principal)
 st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
@@ -258,7 +485,9 @@ perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=p
 
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
 st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
-tab1, tab2 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES"])
+tab1, tab2, tab3, tab_comp, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
+                                            "🔎 ¿Dónde puedo quedar?", "⚖️ Comparar carreras",
+                                            "🗺️ Mapa territorial"])
 
 with tab1:
     st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
@@ -334,6 +563,141 @@ with tab2:
                     f"porque actuaba <i>a través</i> del puntaje: <b>origen → puntaje → acceso</b>.</div>",
                     unsafe_allow_html=True)
 
+with tab3:
+    st.caption("Te muestro **dónde tienes más chance de quedar**: la misma carrera en todas las "
+               "universidades, y **carreras afines de tu área** (no te ofrezco cosas de otra área). "
+               "Probabilidades de acceso **calibradas**.")
+    modo_paes = st.radio("¿Ya rendiste la PAES?",
+                         ["✅ Sí — con mis puntajes (más preciso)", "🔮 Todavía no — con mis notas (PRE-PAES)"],
+                         horizontal=True, key="r_modo")
+    es_post = modo_paes.startswith("✅")
+
+    if es_post:
+        with st.container(border=True):
+            st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: C. Lectora y Matemática M1")
+            rc = st.columns(5)
+            r_clec = rc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="r_clec")
+            r_mate1 = rc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="r_mate1")
+            r_mate2 = rc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="r_mate2", help="0 si no rendiste")
+            r_hcsoc = rc[3].number_input("Historia", 0, 1000, 0, 5, key="r_hcsoc", help="0 si no rendiste")
+            r_cien = rc[4].number_input("Ciencias", 0, 1000, 0, 5, key="r_cien", help="0 si no rendiste")
+        perfil_rec = replace(perfil_base, clec=r_clec, mate1=r_mate1,
+                             mate2=r_mate2 if r_mate2 >= 100 else None,
+                             hcsoc=r_hcsoc if r_hcsoc >= 100 else None,
+                             cien=r_cien if r_cien >= 100 else None)
+        modo_modelo = "post"
+    else:
+        st.info("🔮 Estimación **antes de la PAES**: usa las **notas y el contexto** de la sección 2 (arriba). "
+                "Es más incierta — el puntaje real puede mover bastante el resultado.")
+        perfil_rec = perfil_base
+        modo_modelo = "pre"
+
+    o1, o2 = st.columns([2, 1])
+    orden = o1.radio("Ordenar por", ["🏅 Lo mejor que alcanzo", "🎯 Más probable"], horizontal=True, key="r_orden")
+    modo_orden = "alcanzo" if orden.startswith("🏅") else "prob"
+    solo_reg = o2.checkbox(f"Solo en {L['region'].get(region, region)}", value=False, key="r_reg")
+
+    area_sel = area_de(carrera_sel)
+    sub_misma = cat[cat["CARRERA_U"] == carrera_sel]
+    sub_area = cat[(cat["area"] == area_sel) & (cat["CARRERA_U"] != carrera_sel)] if area_sel else cat.iloc[0:0]
+    if solo_reg:
+        rint = int(region)
+        sub_misma = sub_misma[sub_misma["REGION_CASA_MATRIZ"].astype("Int64") == rint]
+        sub_area = sub_area[sub_area["REGION_CASA_MATRIZ"].astype("Int64") == rint]
+
+    st.markdown(f"<div class='sec'><h3>📍 {carrera_sel.title()} — dónde tienes más chance</h3></div>", unsafe_allow_html=True)
+    r_misma = rankear(art, perfil_rec, sub_misma["CODIGO_CARRERA"].tolist(), modo_modelo)
+    if r_misma:
+        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False, incluir_margen=es_post, modo_orden=modo_orden))
+    else:
+        st.info("No hay universidades para mostrar con ese filtro.")
+
+    if area_sel:
+        st.markdown(f"<div class='sec'><h3>🧭 Otras carreras de tu área: {area_sel}</h3></div>", unsafe_allow_html=True)
+        r_area = rankear(art, perfil_rec, sub_area["CODIGO_CARRERA"].tolist(), modo_modelo)
+        if r_area:
+            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True, incluir_margen=es_post, modo_orden=modo_orden))
+        else:
+            st.info("No hay carreras afines para mostrar con ese filtro.")
+    else:
+        st.caption("No pude clasificar el área de esta carrera; muestro solo la misma carrera en otras universidades.")
+    st.caption("🏅 *Lo mejor que alcanzo* = entre las que tienes ≥50% de probabilidad, ordenadas de más a menos "
+               "selectiva. 🆕 = carrera nueva (sin corte histórico). La tabla es ordenable por cualquier columna.")
+
+with tab_comp:
+    st.caption("Compara **2 o 3 programas** lado a lado para decidir entre tus finalistas: "
+               "probabilidad de acceso, corte, tu margen, vacantes, matrícula efectiva y ponderaciones.")
+    sel_comp = st.multiselect("Programas a comparar (elige 2 o 3)", cat["comp_label"].tolist(),
+                              default=[row["comp_label"]], max_selections=3, key="comp_sel")
+    cm = st.radio("¿Ya rendiste la PAES?", ["✅ Sí — con mis puntajes", "🔮 Todavía no — con mis notas"],
+                  horizontal=True, key="comp_modo")
+    c_post = cm.startswith("✅")
+    if c_post:
+        with st.container(border=True):
+            cc = st.columns(5)
+            cc_clec = cc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="c_clec")
+            cc_mate1 = cc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="c_mate1")
+            cc_mate2 = cc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="c_mate2", help="0 si no rendiste")
+            cc_hcsoc = cc[3].number_input("Historia", 0, 1000, 0, 5, key="c_hcsoc", help="0 si no rendiste")
+            cc_cien = cc[4].number_input("Ciencias", 0, 1000, 0, 5, key="c_cien", help="0 si no rendiste")
+        perfil_comp = replace(perfil_base, clec=cc_clec, mate1=cc_mate1,
+                              mate2=cc_mate2 if cc_mate2 >= 100 else None,
+                              hcsoc=cc_hcsoc if cc_hcsoc >= 100 else None,
+                              cien=cc_cien if cc_cien >= 100 else None)
+    else:
+        st.caption("🔮 Usando tus **notas y contexto** de la sección 2 (estimación antes de la PAES).")
+        perfil_comp = perfil_base
+
+    if len(sel_comp) < 2:
+        st.info("Elige al menos **2 programas** para comparar (puedes buscar otras carreras/universidades en el selector de arriba).")
+    else:
+        cols = st.columns(len(sel_comp))
+        rows_comp = []
+        for col, disp in zip(cols, sel_comp):
+            rc = cat[cat["comp_label"] == disp].iloc[0]
+            rows_comp.append(rc)
+            codc = int(rc["CODIGO_CARRERA"])
+            res = predecir(art, replace(perfil_comp, cod_carrera=codc))
+            p = res["p_post"] if c_post else res["p_pre"]
+            with col:
+                st.markdown(f"<div style='min-height:48px'><b style='color:#1e3a8a'>{str(rc['NOMBRE_CARRERA']).title()}</b><br>"
+                            f"<span style='color:#64748b;font-size:.82rem'>{str(rc['UNIV_U']).title()}</span></div>", unsafe_allow_html=True)
+                if p is not None:
+                    st.plotly_chart(gauge(p, "Prob. de acceso"), use_container_width=True, key=f"cg_{codc}")
+                else:
+                    st.info("Faltan datos para estimar.")
+                st.metric("Corte 2025", f"{res['corte']:.0f}" if res["corte"] else "s/d")
+                if c_post and res["margen"] is not None and res["margen"] == res["margen"]:
+                    st.metric("Tu margen", f"{res['margen']:+.0f}")
+                st.metric("Vacantes 2026", f"{int(vac_total_de(rc))}" if vac_total_de(rc) else "s/d")
+                mtr_c = art.matricula.get(str(codc))
+                if mtr_c and mtr_c.get("tasa") is not None:
+                    st.metric("Matríc. efectiva", f"{mtr_c['tasa']:.0%}")
+                st.caption(f"📍 {rc['reg_nom']} · {rc['area'] or 'área s/c'}")
+        st.plotly_chart(fig_radar_multi(rows_comp, [str(r["UNIV_U"]).title() for r in rows_comp]),
+                        use_container_width=True, key="comp_radar")
+
+with tab4:
+    st.caption("**Tasa histórica de acceso a 1ª preferencia** por territorio (todas las carreras, "
+               "modalidad regular). Tu **región** va resaltada en naranjo 🟠 y tu **comuna** marcada en rojo 🔴.")
+    geo, cent = get_geo()
+    mc1, mc2 = st.columns([1, 1.15])
+    with mc1:
+        st.plotly_chart(fig_mapa(art.territorio, geo, cent, region, comuna, L), use_container_width=True, key="mapa")
+    with mc2:
+        st.plotly_chart(fig_barras_region(art.territorio, region, L), use_container_width=True, key="barras_reg")
+    tr_reg = art.territorio["region"].get(str(region))
+    tr_com = art.territorio["comuna"].get(str(comuna))
+    cols = st.columns(3)
+    if tr_reg:
+        cols[0].metric(f"🟠 {L['region'].get(region, region).replace('Region ', '')}", f"{tr_reg['tasa']:.0%}", help=f"n={tr_reg['n']:,}")
+    if tr_com:
+        cols[1].metric(f"🔴 {L['comuna'].get(comuna, comuna)}", f"{tr_com['tasa']:.0%}", help=f"n={tr_com['n']:,}")
+    prom = sum(s["tasa"] * s["n"] for s in art.territorio["region"].values()) / sum(s["n"] for s in art.territorio["region"].values())
+    cols[2].metric("📊 Promedio nacional", f"{prom:.0%}")
+    st.caption("Es la tasa de acceso de **todas las carreras** de cada territorio (contexto socioterritorial), "
+               "no la de una carrera puntual. Útil para ver brechas geográficas de acceso.")
+
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
     mt, mp = art.meta_post["metrics_temporal"], art.meta_pre["metrics_temporal"]
@@ -342,6 +706,16 @@ with st.expander("ℹ️ Sobre los modelos y los datos"):
 **Validación temporal (entrena 2025 → testea 2026):**
 - Acceso POST-PAES — AUC **{mt['auc_roc']:.3f}** · Acceso PRE-PAES — AUC **{mp['auc_roc']:.3f}**
 - Puntaje probable por prueba (cuantiles): cobertura P10–P90 entre **{min(v['cobertura_p10_p90'] for v in sc.values()):.0%} y {max(v['cobertura_p10_p90'] for v in sc.values()):.0%}** (objetivo 80%)
+
+**Titulación (descriptivo, SIES 2024):** % de mujeres y edad promedio de titulación por carrera/área,
+desde el archivo crudo de titulados del SIES (agregado nacional, no individual). Se asigna por nombre de
+carrera genérica con respaldo por área. Es contexto ("¿cómo es titularse de esto?"), no predicción.
+
+**Matrícula efectiva (descriptivo, no es target):** cruzando admisión ↔ matrícula 2026 por estudiante
+(`ID_aux`), muestra qué % de los **seleccionados** en 1ª preferencia **efectivamente se matriculó** en esa
+carrera. El modelo predice la *selección* (hacer match con la carrera); matricularse o no es decisión del
+postulante, por eso esta cifra se reporta como contexto, no como variable objetivo. Los matriculados totales
+pueden superar a los seleccionados (ingresos vía lista de espera u otras preferencias).
 
 **Cómo se predice el puntaje (percentiles, en simple):** no es una fórmula. Para cada prueba entrenamos un
 modelo de *regresión por cuantiles* (gradient boosting) que aprende, a partir de **notas + contexto**, no un

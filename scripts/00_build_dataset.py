@@ -29,7 +29,7 @@ ARCHIVO_C = {
     2025: P("data/raw/PROCESO-DE-ADMISIÓN-2025-RENDICIÓN-19-01-2025T23-39-20/ArchivoC_Adm2025.csv"),
     2026: P("data/raw/ArchivoC_Adm2026REG.csv"),
 }
-MASTER = P("data/processed/master_admision_2018_2026.parquet")
+MASTER = P("data/processed/master_admision.parquet")   # reconstruido desde crudos por 00a (trazable)
 OFERTA = P("data/raw/OfertaAcadémica_Admisión2026.csv")
 
 PAES = ["CLEC", "MATE1", "MATE2", "HCSOC", "CIEN"]          # pruebas (se coalescen 3 fuentes)
@@ -105,8 +105,13 @@ def cortes_y_cupos(master: pl.DataFrame, anio_previo: int) -> pl.DataFrame:
 
 def build_cohorte(master: pl.DataFrame, anio: int) -> pl.DataFrame:
     """Tabla de modelado para la cohorte `anio`: 1ª preferencia REGULAR + perfil + dificultad carrera."""
+    # Población del modelo = postulaciones VÁLIDAMENTE RANKEADAS en 1ª pref regular:
+    #   ESTADO_PREF 24 (seleccionado, target=1) vs 25 (lista de espera, target=0).
+    # Se excluyen los estados sin ponderado (no evaluados / no cumplen requisitos), que no
+    # compitieron de verdad. Filtro EXPLÍCITO aquí (antes venía oculto en el master antiguo).
     pref = (
-        master.filter((pl.col("anio") == anio) & (pl.col("ORDEN_PREF") == 1) & (pl.col("TIPO_PREF") == "REGULAR"))
+        master.filter((pl.col("anio") == anio) & (pl.col("ORDEN_PREF") == 1)
+                      & (pl.col("TIPO_PREF") == "REGULAR") & (pl.col("ESTADO_PREF").is_in([24, 25])))
         .select(
             "ID_aux", "COD_CARRERA_PREF", "PTJE_PREF",
             (pl.col("ESTADO_PREF") == 24).cast(pl.Int8).alias("ACCESO_1PREF"),
@@ -205,14 +210,25 @@ def main():
         json.dump(stats, f)
     print(f"   ✅ carrera_stats.json  ({cortes_2025.height:,} carreras: corte + cupos)")
 
+    # cortes históricos 2024–2026 por carrera (tendencia del dashboard; contexto, no feature del modelo)
+    cortes_hist: dict = {}
+    for y in (2024, 2025, 2026):
+        cy = cortes_y_cupos(master, y)
+        for c, co in zip(cy["COD_CARRERA_PREF"], cy["CORTE_ANTERIOR"]):
+            cortes_hist.setdefault(str(c), {})[str(y)] = round(float(co), 1)
+    with open(P("data/processed/cortes_historicos.json"), "w") as f:
+        json.dump(cortes_hist, f)
+    print(f"   ✅ cortes_historicos.json  ({len(cortes_hist):,} carreras, años 2024–2026)")
+
     print("4. Exportando catálogo de carreras + ponderaciones (para el dashboard)...")
     # Ponderaciones oficiales → el dashboard calcula el puntaje ponderado del alumno (PTJE_PREF).
     # Se lee con pandas+latin-1 (el CSV de oferta NO es UTF-8) para conservar tildes/Ñ en los nombres.
     import pandas as pd
     of = pd.read_csv(OFERTA, sep=";", encoding="latin-1", decimal=".",
                      usecols=["CODIGO_CARRERA", "NOMBRE_CARRERA", "NOMBRE_UNIVERSIDAD",
-                              "REGION_CASA_MATRIZ", "VACANTES_1SEM", "PONDERADO_MINIMO",
-                              "%_NOTAS", "%_Ranking", "%_LENG", "%_MATE1", "%_MATE2",
+                              "REGION_CASA_MATRIZ", "VACANTES_1SEM", "VACANTES_2SEM",
+                              "CAR_VACANTES_PACE", "CDP_VACANTES_ESPECIALES", "VACANTES_GENERO",
+                              "PONDERADO_MINIMO", "%_NOTAS", "%_Ranking", "%_LENG", "%_MATE1", "%_MATE2",
                               "%_HYCS", "%_CIEN", "EXIGE_MATE2"])
     of["CODIGO_CARRERA"] = pd.to_numeric(of["CODIGO_CARRERA"], errors="coerce").astype("Int64")
     of = of.dropna(subset=["CODIGO_CARRERA"])

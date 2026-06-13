@@ -28,6 +28,9 @@ estimación temprana **antes de la PAES**.
 ```bash
 pip install -r requirements.txt
 
+# 0. Reconstruye la capa de preferencias desde los ArchivoD crudos (trazable, sin filtrado oculto)
+python3 scripts/00a_build_master_admision.py
+
 # 1. ETL: construye la tabla de modelado (cohortes 2025+2026) + catálogo + etiquetas
 python3 scripts/00_build_dataset.py
 
@@ -48,6 +51,8 @@ scripts/
   01_build_models.py      Entrenamiento + validación temporal + calibración → models/*.joblib
   02_build_score_model.py Predicción de puntaje PAES por prueba (regresión por cuantiles)
   03_analisis_determinantes.py  Análisis formal: brechas por origen + OLS + figuras (informe)
+  04_matricula_stats.py   Matrícula efectiva por carrera (cruce admisión↔matrícula por ID_aux)
+  06_titulacion_stats.py  Titulación por carrera/área (género + edad) desde el crudo SIES 2024
 src/
   inference.py            Lógica de predicción (ponderado, encoding, predict) — sin Streamlit
   app.py                  Dashboard Streamlit (predictor de acceso PRE/POST-PAES)

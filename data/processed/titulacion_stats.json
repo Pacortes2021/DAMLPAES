@@ -1,0 +1,1272 @@
+{
+"anio": 2024,
+"por_carrera": {
+"ACTUACION Y TEATRO": {
+"n": 280,
+"pct_muj": 66.1,
+"edad": 25.3
+},
+"ADMINISTRACION DE EMPRESAS E ING. ASOCIADAS": {
+"n": 7166,
+"pct_muj": 65.1,
+"edad": 31.9
+},
+"ADMINISTRACION GASTRONOMICA": {
+"n": 1106,
+"pct_muj": 56.8,
+"edad": 25.0
+},
+"ADMINISTRACION PUBLICA": {
+"n": 2300,
+"pct_muj": 58.8,
+"edad": 32.3
+},
+"ADMINISTRACION TURISTICA Y HOTELERA": {
+"n": 1293,
+"pct_muj": 68.5,
+"edad": 24.5
+},
+"AGRONOMIA": {
+"n": 938,
+"pct_muj": 39.8,
+"edad": 26.5
+},
+"ANALISTA QUIMICO": {
+"n": 66,
+"pct_muj": 50.0,
+"edad": 26.9
+},
+"ANIMACION DIGITAL": {
+"n": 339,
+"pct_muj": 59.6,
+"edad": 23.9
+},
+"ANTROPOLOGIA": {
+"n": 274,
+"pct_muj": 63.1,
+"edad": 26.8
+},
+"ARQUITECTURA": {
+"n": 1716,
+"pct_muj": 53.4,
+"edad": 26.5
+},
+"ARTES Y LICENCIATURA EN ARTES": {
+"n": 576,
+"pct_muj": 75.5,
+"edad": 25.9
+},
+"BACHILLERATO Y/O LICENCIATURA EN CIENCIAS BASICAS": {
+"n": 46,
+"pct_muj": 50.0,
+"edad": 26.5
+},
+"BACHILLERATO Y/O LICENCIATURA EN EDUCACION": {
+"n": 331,
+"pct_muj": 73.1,
+"edad": 35.3
+},
+"BACHILLERATO Y/O LICENCIATURA EN HUMANIDADES": {
+"n": 59,
+"pct_muj": 39.0,
+"edad": 31.1
+},
+"BACHILLERATO Y/O LICENCIATURA EN SALUD": {
+"n": 206,
+"pct_muj": 80.1,
+"edad": 29.1
+},
+"BIBLIOTECOLOGIA": {
+"n": 66,
+"pct_muj": 68.2,
+"edad": 27.6
+},
+"BIOLOGIA": {
+"n": 183,
+"pct_muj": 59.6,
+"edad": 25.7
+},
+"BIOLOGIA MARINA Y ECOLOGIA MARINA": {
+"n": 222,
+"pct_muj": 60.8,
+"edad": 25.2
+},
+"BIOQUIMICA": {
+"n": 315,
+"pct_muj": 57.5,
+"edad": 25.2
+},
+"BIOTECNOLOGIA": {
+"n": 48,
+"pct_muj": 47.9,
+"edad": 25.9
+},
+"CIENCIAS POLITICAS": {
+"n": 333,
+"pct_muj": 58.0,
+"edad": 24.6
+},
+"COMUNICACION AUDIOVISUAL Y/O MULTIMEDIA": {
+"n": 634,
+"pct_muj": 44.5,
+"edad": 24.8
+},
+"CONSTRUCCION CIVIL": {
+"n": 1912,
+"pct_muj": 22.6,
+"edad": 30.2
+},
+"CONTADOR AUDITOR": {
+"n": 4211,
+"pct_muj": 63.5,
+"edad": 28.8
+},
+"DERECHO": {
+"n": 4923,
+"pct_muj": 54.6,
+"edad": 29.0
+},
+"DISENO": {
+"n": 696,
+"pct_muj": 83.0,
+"edad": 24.7
+},
+"DISENO DE AMBIENTES E INTERIORES": {
+"n": 150,
+"pct_muj": 88.0,
+"edad": 25.9
+},
+"DISENO DE VESTUARIO": {
+"n": 242,
+"pct_muj": 88.0,
+"edad": 25.2
+},
+"DISENO GRAFICO": {
+"n": 1089,
+"pct_muj": 59.3,
+"edad": 25.1
+},
+"DISENO INDUSTRIAL": {
+"n": 191,
+"pct_muj": 50.3,
+"edad": 25.9
+},
+"DOCTORADO EN AGROPECUARIA": {
+"n": 59,
+"pct_muj": 59.3,
+"edad": 39.0
+},
+"DOCTORADO EN CIENCIAS BASICAS": {
+"n": 347,
+"pct_muj": 35.4,
+"edad": 33.9
+},
+"DOCTORADO EN CIENCIAS SOCIALES": {
+"n": 203,
+"pct_muj": 46.3,
+"edad": 41.6
+},
+"DOCTORADO EN EDUCACION": {
+"n": 100,
+"pct_muj": 63.0,
+"edad": 40.1
+},
+"DOCTORADO EN HUMANIDADES": {
+"n": 123,
+"pct_muj": 47.2,
+"edad": 42.2
+},
+"DOCTORADO EN SALUD": {
+"n": 91,
+"pct_muj": 60.4,
+"edad": 36.2
+},
+"DOCTORADO EN TECNOLOGIA": {
+"n": 211,
+"pct_muj": 30.3,
+"edad": 36.7
+},
+"ENFERMERIA": {
+"n": 5642,
+"pct_muj": 83.5,
+"edad": 25.5
+},
+"FILOSOFIA": {
+"n": 95,
+"pct_muj": 31.6,
+"edad": 26.8
+},
+"FISICA Y ASTRONOMIA": {
+"n": 261,
+"pct_muj": 28.4,
+"edad": 24.5
+},
+"FONOAUDIOLOGIA": {
+"n": 1487,
+"pct_muj": 91.0,
+"edad": 24.8
+},
+"FOTOGRAFIA": {
+"n": 95,
+"pct_muj": 66.3,
+"edad": 27.0
+},
+"GEOGRAFIA": {
+"n": 234,
+"pct_muj": 46.6,
+"edad": 26.6
+},
+"GEOLOGIA": {
+"n": 538,
+"pct_muj": 41.3,
+"edad": 27.5
+},
+"HISTORIA": {
+"n": 334,
+"pct_muj": 45.2,
+"edad": 24.7
+},
+"INGENIERIA AGRICOLA": {
+"n": 920,
+"pct_muj": 48.5,
+"edad": 26.4
+},
+"INGENIERIA AGROINDUSTRIAL": {
+"n": 32,
+"pct_muj": 59.4,
+"edad": 31.9
+},
+"INGENIERIA CIVIL AMBIENTAL": {
+"n": 140,
+"pct_muj": 55.7,
+"edad": 26.6
+},
+"INGENIERIA CIVIL BIOQUIMICA": {
+"n": 39,
+"pct_muj": 56.4,
+"edad": 25.5
+},
+"INGENIERIA CIVIL ELECTRICA": {
+"n": 579,
+"pct_muj": 12.4,
+"edad": 26.2
+},
+"INGENIERIA CIVIL ELECTRONICA": {
+"n": 263,
+"pct_muj": 7.6,
+"edad": 26.6
+},
+"INGENIERIA CIVIL EN BIOMEDICA": {
+"n": 97,
+"pct_muj": 56.7,
+"edad": 24.7
+},
+"INGENIERIA CIVIL EN BIOTECNOLOGIA Y/O BIOINGENIERIA": {
+"n": 95,
+"pct_muj": 60.0,
+"edad": 24.9
+},
+"INGENIERIA CIVIL EN COMPUTACION E INFORMATICA": {
+"n": 1537,
+"pct_muj": 10.6,
+"edad": 25.4
+},
+"INGENIERIA CIVIL EN MINAS": {
+"n": 680,
+"pct_muj": 24.3,
+"edad": 28.2
+},
+"INGENIERIA CIVIL EN OBRAS CIVILES": {
+"n": 559,
+"pct_muj": 27.2,
+"edad": 27.6
+},
+"INGENIERIA CIVIL EN TELEMATICA": {
+"n": 38,
+"pct_muj": 23.7,
+"edad": 25.7
+},
+"INGENIERIA CIVIL INDUSTRIAL": {
+"n": 6491,
+"pct_muj": 29.2,
+"edad": 29.0
+},
+"INGENIERIA CIVIL MATEMATICA Y ESTADISTICA": {
+"n": 105,
+"pct_muj": 15.2,
+"edad": 25.4
+},
+"INGENIERIA CIVIL MECANICA": {
+"n": 768,
+"pct_muj": 8.9,
+"edad": 27.1
+},
+"INGENIERIA CIVIL METALURGICA": {
+"n": 219,
+"pct_muj": 26.9,
+"edad": 27.6
+},
+"INGENIERIA CIVIL QUIMICA": {
+"n": 390,
+"pct_muj": 45.4,
+"edad": 26.1
+},
+"INGENIERIA CIVIL, PLAN COMUN Y LICENCIATURA EN CIENCIAS DE LA INGENIERIA": {
+"n": 777,
+"pct_muj": 28.6,
+"edad": 26.1
+},
+"INGENIERIA COMERCIAL": {
+"n": 7786,
+"pct_muj": 45.0,
+"edad": 26.9
+},
+"INGENIERIA EN ALIMENTOS": {
+"n": 115,
+"pct_muj": 64.3,
+"edad": 27.0
+},
+"INGENIERIA EN AUTOMATIZACION, INSTRUMENTACION Y CONTROL": {
+"n": 931,
+"pct_muj": 6.9,
+"edad": 30.3
+},
+"INGENIERIA EN BIOTECNOLOGIA Y BIOINGENIERIA": {
+"n": 331,
+"pct_muj": 54.1,
+"edad": 25.3
+},
+"INGENIERIA EN COMERCIO EXTERIOR": {
+"n": 887,
+"pct_muj": 58.9,
+"edad": 27.0
+},
+"INGENIERIA EN COMPUTACION E INFORMATICA": {
+"n": 3426,
+"pct_muj": 12.4,
+"edad": 27.8
+},
+"INGENIERIA EN CONECTIVIDAD Y REDES": {
+"n": 841,
+"pct_muj": 9.4,
+"edad": 28.8
+},
+"INGENIERIA EN CONSTRUCCION": {
+"n": 2584,
+"pct_muj": 21.6,
+"edad": 28.5
+},
+"INGENIERIA EN CONTROL DE GESTION": {
+"n": 707,
+"pct_muj": 55.2,
+"edad": 29.3
+},
+"INGENIERIA EN ELECTRICIDAD": {
+"n": 2321,
+"pct_muj": 4.3,
+"edad": 30.1
+},
+"INGENIERIA EN ELECTRONICA": {
+"n": 118,
+"pct_muj": 12.7,
+"edad": 27.8
+},
+"INGENIERIA EN ENERGIA": {
+"n": 52,
+"pct_muj": 32.7,
+"edad": 27.5
+},
+"INGENIERIA EN FINANZAS": {
+"n": 1186,
+"pct_muj": 64.2,
+"edad": 28.3
+},
+"INGENIERIA EN GEOMENSURA Y CARTOGRAFIA": {
+"n": 294,
+"pct_muj": 33.0,
+"edad": 29.9
+},
+"INGENIERIA EN GESTION PUBLICA": {
+"n": 335,
+"pct_muj": 68.7,
+"edad": 39.3
+},
+"INGENIERIA EN GESTION Y CONTROL DE CALIDAD": {
+"n": 137,
+"pct_muj": 45.3,
+"edad": 38.2
+},
+"INGENIERIA EN LOGISTICA": {
+"n": 1647,
+"pct_muj": 40.3,
+"edad": 31.5
+},
+"INGENIERIA EN MARKETING": {
+"n": 580,
+"pct_muj": 55.9,
+"edad": 26.1
+},
+"INGENIERIA EN MATEMATICA Y ESTADISTICA": {
+"n": 81,
+"pct_muj": 30.9,
+"edad": 26.7
+},
+"INGENIERIA EN MECANICA AUTOMOTRIZ": {
+"n": 2801,
+"pct_muj": 3.7,
+"edad": 25.5
+},
+"INGENIERIA EN MEDIO AMBIENTE": {
+"n": 426,
+"pct_muj": 58.2,
+"edad": 26.6
+},
+"INGENIERIA EN METALURGIA": {
+"n": 137,
+"pct_muj": 44.5,
+"edad": 26.7
+},
+"INGENIERIA EN MINAS": {
+"n": 819,
+"pct_muj": 27.2,
+"edad": 30.1
+},
+"INGENIERIA EN PREVENCION DE RIESGOS": {
+"n": 2010,
+"pct_muj": 46.3,
+"edad": 34.2
+},
+"INGENIERIA EN QUIMICA": {
+"n": 200,
+"pct_muj": 61.5,
+"edad": 26.9
+},
+"INGENIERIA EN RECURSOS HUMANOS": {
+"n": 1317,
+"pct_muj": 78.3,
+"edad": 31.2
+},
+"INGENIERIA EN RECURSOS RENOVABLES": {
+"n": 229,
+"pct_muj": 55.5,
+"edad": 25.9
+},
+"INGENIERIA EN REFRIGERACION Y CLIMATIZACION": {
+"n": 86,
+"pct_muj": 3.5,
+"edad": 26.7
+},
+"INGENIERIA EN SEGURIDAD PRIVADA": {
+"n": 751,
+"pct_muj": 14.6,
+"edad": 34.6
+},
+"INGENIERIA EN SONIDO": {
+"n": 194,
+"pct_muj": 8.2,
+"edad": 25.1
+},
+"INGENIERIA EN TELECOMUNICACIONES": {
+"n": 283,
+"pct_muj": 9.9,
+"edad": 26.5
+},
+"INGENIERIA EN TRANSPORTE Y TRANSITO": {
+"n": 30,
+"pct_muj": 36.7,
+"edad": 26.9
+},
+"INGENIERIA FORESTAL": {
+"n": 123,
+"pct_muj": 49.6,
+"edad": 26.3
+},
+"INGENIERIA INDUSTRIAL": {
+"n": 2748,
+"pct_muj": 19.9,
+"edad": 34.8
+},
+"INGENIERIA MARINA Y MARITIMO PORTUARIA": {
+"n": 79,
+"pct_muj": 20.3,
+"edad": 25.5
+},
+"INGENIERIA MECANICA": {
+"n": 975,
+"pct_muj": 6.5,
+"edad": 28.3
+},
+"KINESIOLOGIA": {
+"n": 2828,
+"pct_muj": 53.7,
+"edad": 24.9
+},
+"LICENCIATURA EN LETRAS Y LITERATURA": {
+"n": 352,
+"pct_muj": 70.5,
+"edad": 23.9
+},
+"MAGISTER EN ADMINISTRACION Y COMERCIO": {
+"n": 7046,
+"pct_muj": 43.8,
+"edad": 36.5
+},
+"MAGISTER EN AGROPECUARIA": {
+"n": 161,
+"pct_muj": 51.6,
+"edad": 31.1
+},
+"MAGISTER EN ARTE Y ARQUITECTURA": {
+"n": 507,
+"pct_muj": 50.3,
+"edad": 32.1
+},
+"MAGISTER EN CIENCIAS BASICAS": {
+"n": 835,
+"pct_muj": 33.3,
+"edad": 31.9
+},
+"MAGISTER EN CIENCIAS SOCIALES": {
+"n": 2408,
+"pct_muj": 57.6,
+"edad": 35.2
+},
+"MAGISTER EN DERECHO": {
+"n": 1249,
+"pct_muj": 48.5,
+"edad": 38.0
+},
+"MAGISTER EN EDUCACION": {
+"n": 3648,
+"pct_muj": 70.8,
+"edad": 37.9
+},
+"MAGISTER EN HUMANIDADES": {
+"n": 441,
+"pct_muj": 43.1,
+"edad": 38.0
+},
+"MAGISTER EN SALUD": {
+"n": 1402,
+"pct_muj": 66.0,
+"edad": 35.4
+},
+"MAGISTER EN TECNOLOGIA": {
+"n": 2001,
+"pct_muj": 25.3,
+"edad": 34.1
+},
+"MATEMATICA Y/O ESTADISTICA": {
+"n": 64,
+"pct_muj": 21.9,
+"edad": 24.7
+},
+"MEDICINA": {
+"n": 2430,
+"pct_muj": 54.8,
+"edad": 25.9
+},
+"MEDICINA VETERINARIA": {
+"n": 1485,
+"pct_muj": 73.9,
+"edad": 26.7
+},
+"MUSICA, CANTO O DANZA": {
+"n": 650,
+"pct_muj": 39.5,
+"edad": 25.7
+},
+"NATUROPATIA": {
+"n": 54,
+"pct_muj": 92.6,
+"edad": 34.9
+},
+"NUTRICION Y DIETETICA": {
+"n": 1856,
+"pct_muj": 85.1,
+"edad": 25.2
+},
+"OBSTETRICIA Y PUERICULTURA": {
+"n": 2072,
+"pct_muj": 95.3,
+"edad": 24.6
+},
+"ODONTOLOGIA": {
+"n": 1781,
+"pct_muj": 68.8,
+"edad": 25.8
+},
+"OTRAS INGENIERIAS": {
+"n": 117,
+"pct_muj": 40.2,
+"edad": 25.7
+},
+"OTRAS INGENIERIAS CIVILES": {
+"n": 208,
+"pct_muj": 30.3,
+"edad": 26.3
+},
+"OTROS PROFESIONALES DE ADMINISTRACION Y COMERCIO": {
+"n": 31,
+"pct_muj": 54.8,
+"edad": 27.1
+},
+"OTROS PROFESIONALES DE ARTE Y ARQUITECTURA": {
+"n": 356,
+"pct_muj": 77.2,
+"edad": 23.9
+},
+"OTROS PROFESIONALES DE CIENCIAS SOCIALES": {
+"n": 110,
+"pct_muj": 76.4,
+"edad": 25.1
+},
+"OTROS PROFESIONALES DE EDUCACION": {
+"n": 351,
+"pct_muj": 19.7,
+"edad": 26.3
+},
+"OTROS PROFESIONALES DE TECNOLOGIA": {
+"n": 216,
+"pct_muj": 38.4,
+"edad": 25.3
+},
+"OTROS TECNICOS DE ADMINISTRACION Y COMERCIO": {
+"n": 99,
+"pct_muj": 72.7,
+"edad": 28.1
+},
+"OTROS TECNICOS DE ARTE Y ARQUITECTURA": {
+"n": 295,
+"pct_muj": 68.1,
+"edad": 25.3
+},
+"OTROS TECNICOS DE CIENCIAS SOCIALES": {
+"n": 103,
+"pct_muj": 82.5,
+"edad": 31.6
+},
+"OTROS TECNICOS DE EDUCACION": {
+"n": 306,
+"pct_muj": 89.5,
+"edad": 40.5
+},
+"OTROS TECNICOS DE TECNOLOGIA": {
+"n": 99,
+"pct_muj": 14.1,
+"edad": 39.8
+},
+"PEDAGOGIA EN ARTES Y MUSICA": {
+"n": 366,
+"pct_muj": 50.8,
+"edad": 25.4
+},
+"PEDAGOGIA EN CIENCIAS": {
+"n": 527,
+"pct_muj": 57.7,
+"edad": 25.2
+},
+"PEDAGOGIA EN EDUCACION BASICA": {
+"n": 1521,
+"pct_muj": 88.0,
+"edad": 25.6
+},
+"PEDAGOGIA EN EDUCACION DE PARVULOS": {
+"n": 1434,
+"pct_muj": 99.9,
+"edad": 26.3
+},
+"PEDAGOGIA EN EDUCACION DIFERENCIAL": {
+"n": 1929,
+"pct_muj": 95.1,
+"edad": 26.8
+},
+"PEDAGOGIA EN EDUCACION FISICA": {
+"n": 1305,
+"pct_muj": 32.4,
+"edad": 24.7
+},
+"PEDAGOGIA EN EDUCACION MEDIA": {
+"n": 246,
+"pct_muj": 54.5,
+"edad": 30.3
+},
+"PEDAGOGIA EN EDUCACION TECNICO PROFESIONAL": {
+"n": 102,
+"pct_muj": 51.0,
+"edad": 38.6
+},
+"PEDAGOGIA EN FILOSOFIA Y RELIGION": {
+"n": 97,
+"pct_muj": 49.5,
+"edad": 30.2
+},
+"PEDAGOGIA EN HISTORIA, GEOGRAFIA Y CIENCIAS SOCIALES": {
+"n": 532,
+"pct_muj": 45.9,
+"edad": 25.1
+},
+"PEDAGOGIA EN IDIOMAS": {
+"n": 989,
+"pct_muj": 69.4,
+"edad": 24.6
+},
+"PEDAGOGIA EN LENGUAJE, COMUNICACION Y/O CASTELLANO": {
+"n": 749,
+"pct_muj": 71.2,
+"edad": 24.4
+},
+"PEDAGOGIA EN MATEMATICAS Y COMPUTACION": {
+"n": 597,
+"pct_muj": 48.7,
+"edad": 24.9
+},
+"PERIODISMO": {
+"n": 1386,
+"pct_muj": 55.6,
+"edad": 25.2
+},
+"POSTITULO EN ADMINISTRACION Y COMERCIO": {
+"n": 15833,
+"pct_muj": 54.0,
+"edad": 36.9
+},
+"POSTITULO EN AGROPECUARIA": {
+"n": 657,
+"pct_muj": 60.4,
+"edad": 34.2
+},
+"POSTITULO EN ARTE Y ARQUITECTURA": {
+"n": 1053,
+"pct_muj": 58.1,
+"edad": 33.6
+},
+"POSTITULO EN CIENCIAS BASICAS": {
+"n": 1209,
+"pct_muj": 38.5,
+"edad": 34.7
+},
+"POSTITULO EN CIENCIAS SOCIALES": {
+"n": 5889,
+"pct_muj": 71.1,
+"edad": 36.3
+},
+"POSTITULO EN DERECHO": {
+"n": 4346,
+"pct_muj": 52.9,
+"edad": 36.2
+},
+"POSTITULO EN EDUCACION": {
+"n": 8487,
+"pct_muj": 73.0,
+"edad": 37.1
+},
+"POSTITULO EN HUMANIDADES": {
+"n": 661,
+"pct_muj": 53.9,
+"edad": 39.8
+},
+"POSTITULO EN SALUD": {
+"n": 14217,
+"pct_muj": 69.1,
+"edad": 32.5
+},
+"POSTITULO EN TECNOLOGIA": {
+"n": 4688,
+"pct_muj": 27.6,
+"edad": 36.7
+},
+"PROGRAMAS DE FORMACION PEDAGOGICA": {
+"n": 353,
+"pct_muj": 51.8,
+"edad": 32.5
+},
+"PSICOLOGIA": {
+"n": 6775,
+"pct_muj": 72.7,
+"edad": 27.4
+},
+"PSICOPEDAGOGIA": {
+"n": 1579,
+"pct_muj": 95.0,
+"edad": 29.0
+},
+"PUBLICIDAD": {
+"n": 831,
+"pct_muj": 56.9,
+"edad": 24.2
+},
+"QUIMICA AMBIENTAL": {
+"n": 67,
+"pct_muj": 55.2,
+"edad": 25.8
+},
+"QUIMICA Y FARMACIA": {
+"n": 1048,
+"pct_muj": 59.4,
+"edad": 25.9
+},
+"QUIMICA, LICENCIADO EN QUIMICA": {
+"n": 115,
+"pct_muj": 46.1,
+"edad": 26.4
+},
+"REALIZADOR DE CINE Y TELEVISION": {
+"n": 275,
+"pct_muj": 46.9,
+"edad": 24.9
+},
+"RELACIONES PUBLICAS": {
+"n": 175,
+"pct_muj": 77.1,
+"edad": 26.2
+},
+"SECRETARIADO BILINGUE": {
+"n": 37,
+"pct_muj": 94.6,
+"edad": 30.1
+},
+"SECRETARIADO EJECUTIVO": {
+"n": 50,
+"pct_muj": 90.0,
+"edad": 32.1
+},
+"SOCIOLOGIA": {
+"n": 479,
+"pct_muj": 49.3,
+"edad": 25.8
+},
+"TECNICO AGROPECUARIO": {
+"n": 1471,
+"pct_muj": 45.5,
+"edad": 26.8
+},
+"TECNICO ASISTENTE DEL EDUCADOR DE PARVULOS": {
+"n": 5553,
+"pct_muj": 99.8,
+"edad": 28.8
+},
+"TECNICO ASISTENTE DEL EDUCADOR DIFERENCIAL": {
+"n": 2205,
+"pct_muj": 96.7,
+"edad": 28.7
+},
+"TECNICO DENTAL Y ASISTENTE DE ODONTOLOGIA": {
+"n": 1893,
+"pct_muj": 88.2,
+"edad": 24.1
+},
+"TECNICO EN ACUICULTURA Y PESCA": {
+"n": 94,
+"pct_muj": 37.2,
+"edad": 26.2
+},
+"TECNICO EN ADMINISTRACION DE EMPRESAS": {
+"n": 8446,
+"pct_muj": 65.8,
+"edad": 31.0
+},
+"TECNICO EN ADMINISTRACION DE RECURSOS HUMANOS Y PERSONAL": {
+"n": 1074,
+"pct_muj": 81.8,
+"edad": 33.5
+},
+"TECNICO EN ADMINISTRACION DE REDES Y SOPORTE": {
+"n": 321,
+"pct_muj": 10.6,
+"edad": 33.5
+},
+"TECNICO EN ADMINISTRACION DE VENTAS": {
+"n": 77,
+"pct_muj": 59.7,
+"edad": 32.2
+},
+"TECNICO EN ADMINISTRACION EN MARKETING": {
+"n": 451,
+"pct_muj": 57.4,
+"edad": 27.9
+},
+"TECNICO EN ADMINISTRACION FINANCIERA Y FINANZAS": {
+"n": 463,
+"pct_muj": 56.4,
+"edad": 28.1
+},
+"TECNICO EN ADMINISTRACION PUBLICA O MUNICIPAL": {
+"n": 1135,
+"pct_muj": 67.4,
+"edad": 37.6
+},
+"TECNICO EN ALIMENTOS": {
+"n": 155,
+"pct_muj": 76.1,
+"edad": 30.2
+},
+"TECNICO EN ANALISIS DE DATOS": {
+"n": 54,
+"pct_muj": 44.4,
+"edad": 36.5
+},
+"TECNICO EN ANALISIS DE SISTEMAS": {
+"n": 44,
+"pct_muj": 18.2,
+"edad": 32.9
+},
+"TECNICO EN BIBLIOTECAS Y CENTROS DE DOCUMENTACION": {
+"n": 34,
+"pct_muj": 61.8,
+"edad": 34.7
+},
+"TECNICO EN COMERCIO EXTERIOR": {
+"n": 733,
+"pct_muj": 57.2,
+"edad": 28.1
+},
+"TECNICO EN COMPUTACION E INFORMATICA": {
+"n": 3223,
+"pct_muj": 14.2,
+"edad": 27.5
+},
+"TECNICO EN COMUNICACION AUDIOVISUAL": {
+"n": 164,
+"pct_muj": 27.4,
+"edad": 27.2
+},
+"TECNICO EN COMUNICACION SOCIAL": {
+"n": 34,
+"pct_muj": 44.1,
+"edad": 29.1
+},
+"TECNICO EN CONSTRUCCION Y OBRAS CIVILES": {
+"n": 2877,
+"pct_muj": 18.6,
+"edad": 30.1
+},
+"TECNICO EN CONTABILIDAD GENERAL": {
+"n": 2563,
+"pct_muj": 68.7,
+"edad": 32.4
+},
+"TECNICO EN CONTABILIDAD TRIBUTARIA": {
+"n": 82,
+"pct_muj": 67.1,
+"edad": 33.0
+},
+"TECNICO EN DEPORTE, RECREACION Y PREPARACION FISICA": {
+"n": 1912,
+"pct_muj": 23.8,
+"edad": 25.0
+},
+"TECNICO EN DIBUJO ARQUITECTONICO": {
+"n": 225,
+"pct_muj": 38.2,
+"edad": 26.0
+},
+"TECNICO EN DIBUJO TECNICO": {
+"n": 41,
+"pct_muj": 34.1,
+"edad": 28.3
+},
+"TECNICO EN DISENO DE VESTUARIO": {
+"n": 78,
+"pct_muj": 88.5,
+"edad": 25.7
+},
+"TECNICO EN DISENO GRAFICO": {
+"n": 260,
+"pct_muj": 55.0,
+"edad": 26.6
+},
+"TECNICO EN ELECTRICIDAD Y ELECTRICIDAD INDUSTRIAL": {
+"n": 2875,
+"pct_muj": 4.2,
+"edad": 30.0
+},
+"TECNICO EN ELECTROMECANICA": {
+"n": 330,
+"pct_muj": 6.7,
+"edad": 26.0
+},
+"TECNICO EN ELECTRONICA Y ELECTRONICA INDUSTRIAL": {
+"n": 109,
+"pct_muj": 2.8,
+"edad": 24.7
+},
+"TECNICO EN ENERGIA": {
+"n": 331,
+"pct_muj": 14.2,
+"edad": 27.6
+},
+"TECNICO EN ENFERMERIA": {
+"n": 11948,
+"pct_muj": 84.5,
+"edad": 26.8
+},
+"TECNICO EN FARMACIA": {
+"n": 978,
+"pct_muj": 76.8,
+"edad": 30.8
+},
+"TECNICO EN GASTRONOMIA Y COCINA": {
+"n": 3359,
+"pct_muj": 57.7,
+"edad": 24.6
+},
+"TECNICO EN GEOLOGIA": {
+"n": 50,
+"pct_muj": 38.0,
+"edad": 24.7
+},
+"TECNICO EN GESTION Y CONTROL DE CALIDAD": {
+"n": 56,
+"pct_muj": 50.0,
+"edad": 38.1
+},
+"TECNICO EN INSTRUMENTACION, AUTOMATIZACION Y CONTROL INDUSTRIAL": {
+"n": 1796,
+"pct_muj": 8.2,
+"edad": 31.3
+},
+"TECNICO EN LABORATORIO CLINICO": {
+"n": 605,
+"pct_muj": 80.5,
+"edad": 25.4
+},
+"TECNICO EN LOGISTICA": {
+"n": 2837,
+"pct_muj": 38.5,
+"edad": 31.7
+},
+"TECNICO EN MANTENIMIENTO INDUSTRIAL": {
+"n": 1743,
+"pct_muj": 7.6,
+"edad": 26.4
+},
+"TECNICO EN MASOTERAPIA": {
+"n": 429,
+"pct_muj": 75.3,
+"edad": 29.3
+},
+"TECNICO EN MECANICA AUTOMOTRIZ": {
+"n": 2963,
+"pct_muj": 5.0,
+"edad": 25.0
+},
+"TECNICO EN MECANICA INDUSTRIAL": {
+"n": 386,
+"pct_muj": 6.7,
+"edad": 27.7
+},
+"TECNICO EN MEDIO AMBIENTE (CONTROL Y GESTION)": {
+"n": 227,
+"pct_muj": 51.5,
+"edad": 33.7
+},
+"TECNICO EN METALURGIA": {
+"n": 169,
+"pct_muj": 43.2,
+"edad": 26.5
+},
+"TECNICO EN MINERIA": {
+"n": 1001,
+"pct_muj": 26.5,
+"edad": 29.2
+},
+"TECNICO EN NUTRICION Y DIETETICA": {
+"n": 40,
+"pct_muj": 85.0,
+"edad": 35.5
+},
+"TECNICO EN PELUQUERIA Y ESTETICA": {
+"n": 1977,
+"pct_muj": 98.4,
+"edad": 23.9
+},
+"TECNICO EN PODOLOGIA": {
+"n": 1273,
+"pct_muj": 94.3,
+"edad": 37.7
+},
+"TECNICO EN PREVENCION DE RIESGOS": {
+"n": 1179,
+"pct_muj": 49.4,
+"edad": 32.4
+},
+"TECNICO EN PREVENCION Y REHABILITACION": {
+"n": 238,
+"pct_muj": 66.4,
+"edad": 36.0
+},
+"TECNICO EN PROCESOS INDUSTRIALES": {
+"n": 43,
+"pct_muj": 32.6,
+"edad": 28.5
+},
+"TECNICO EN PRODUCCION DE EVENTOS": {
+"n": 30,
+"pct_muj": 76.7,
+"edad": 25.1
+},
+"TECNICO EN PRODUCCION GRAFICA Y MULTIMEDIA": {
+"n": 336,
+"pct_muj": 45.8,
+"edad": 25.6
+},
+"TECNICO EN PRODUCCION, DESARROLLO Y DISENO WEB": {
+"n": 72,
+"pct_muj": 37.5,
+"edad": 26.7
+},
+"TECNICO EN QUIMICA (ANALISIS E INDUSTRIAL)": {
+"n": 122,
+"pct_muj": 64.8,
+"edad": 26.6
+},
+"TECNICO EN RADIOLOGIA Y RADIOTERAPIA": {
+"n": 197,
+"pct_muj": 65.0,
+"edad": 26.9
+},
+"TECNICO EN REFRIGERACION Y CLIMATIZACION": {
+"n": 129,
+"pct_muj": 6.2,
+"edad": 27.5
+},
+"TECNICO EN RELACIONES PUBLICAS": {
+"n": 57,
+"pct_muj": 66.7,
+"edad": 33.4
+},
+"TECNICO EN SEGURIDAD PRIVADA": {
+"n": 46,
+"pct_muj": 13.0,
+"edad": 43.2
+},
+"TECNICO EN SERVICIO SOCIAL": {
+"n": 2880,
+"pct_muj": 86.9,
+"edad": 33.7
+},
+"TECNICO EN SONIDO": {
+"n": 273,
+"pct_muj": 11.4,
+"edad": 24.7
+},
+"TECNICO EN TELECOMUNICACIONES": {
+"n": 468,
+"pct_muj": 7.9,
+"edad": 26.8
+},
+"TECNICO EN TERAPIAS NATURALES Y NATUROPATIA": {
+"n": 90,
+"pct_muj": 91.1,
+"edad": 32.7
+},
+"TECNICO EN TOPOGRAFIA": {
+"n": 575,
+"pct_muj": 19.5,
+"edad": 28.5
+},
+"TECNICO EN TRADUCCION E INTERPRETARIADO": {
+"n": 99,
+"pct_muj": 57.6,
+"edad": 26.1
+},
+"TECNICO EN TRANSPORTE MARITIMO Y PUERTOS": {
+"n": 85,
+"pct_muj": 50.6,
+"edad": 27.3
+},
+"TECNICO EN TURISMO Y HOTELERIA": {
+"n": 1167,
+"pct_muj": 64.7,
+"edad": 24.4
+},
+"TECNICO JURIDICO": {
+"n": 842,
+"pct_muj": 75.1,
+"edad": 31.8
+},
+"TECNICO LABORATORISTA DENTAL": {
+"n": 276,
+"pct_muj": 72.5,
+"edad": 28.2
+},
+"TECNICO VETERINARIO": {
+"n": 976,
+"pct_muj": 80.1,
+"edad": 24.5
+},
+"TECNOLOGIA MEDICA": {
+"n": 2210,
+"pct_muj": 61.2,
+"edad": 24.9
+},
+"TERAPIA OCUPACIONAL": {
+"n": 2308,
+"pct_muj": 86.7,
+"edad": 24.7
+},
+"TRABAJO SOCIAL": {
+"n": 6789,
+"pct_muj": 85.9,
+"edad": 30.7
+},
+"TRADUCCION E INTERPRETACION": {
+"n": 354,
+"pct_muj": 67.2,
+"edad": 25.5
+}
+},
+"por_area": {
+"Administración y Negocios": {
+"n": 64948,
+"pct_muj": 56.7,
+"edad": 31.9
+},
+"Agropecuaria y Veterinaria": {
+"n": 5841,
+"pct_muj": 59.4,
+"edad": 27.4
+},
+"Arte y Arquitectura": {
+"n": 9346,
+"pct_muj": 60.3,
+"edad": 26.8
+},
+"Ciencias Básicas": {
+"n": 1540,
+"pct_muj": 50.2,
+"edad": 25.5
+},
+"Ciencias Sociales": {
+"n": 28794,
+"pct_muj": 72.7,
+"edad": 31.2
+},
+"Derecho": {
+"n": 10542,
+"pct_muj": 53.2,
+"edad": 33.1
+},
+"Educación": {
+"n": 13885,
+"pct_muj": 68.1,
+"edad": 26.1
+},
+"Humanidades": {
+"n": 2210,
+"pct_muj": 54.7,
+"edad": 33.2
+},
+"Ingeniería y Tecnología": {
+"n": 53720,
+"pct_muj": 25.3,
+"edad": 28.9
+},
+"Salud": {
+"n": 54443,
+"pct_muj": 75.7,
+"edad": 27.8
+}
+}
+}
