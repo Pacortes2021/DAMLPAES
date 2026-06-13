@@ -210,6 +210,16 @@ def main():
         json.dump(stats, f)
     print(f"   ✅ carrera_stats.json  ({cortes_2025.height:,} carreras: corte + cupos)")
 
+    # cortes históricos 2024–2026 por carrera (tendencia del dashboard; contexto, no feature del modelo)
+    cortes_hist: dict = {}
+    for y in (2024, 2025, 2026):
+        cy = cortes_y_cupos(master, y)
+        for c, co in zip(cy["COD_CARRERA_PREF"], cy["CORTE_ANTERIOR"]):
+            cortes_hist.setdefault(str(c), {})[str(y)] = round(float(co), 1)
+    with open(P("data/processed/cortes_historicos.json"), "w") as f:
+        json.dump(cortes_hist, f)
+    print(f"   ✅ cortes_historicos.json  ({len(cortes_hist):,} carreras, años 2024–2026)")
+
     print("4. Exportando catálogo de carreras + ponderaciones (para el dashboard)...")
     # Ponderaciones oficiales → el dashboard calcula el puntaje ponderado del alumno (PTJE_PREF).
     # Se lee con pandas+latin-1 (el CSV de oferta NO es UTF-8) para conservar tildes/Ñ en los nombres.

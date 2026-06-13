@@ -136,6 +136,25 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
+def fig_corte_trend(hist: dict):
+    """Mini-línea con el corte de la carrera en 2024–2026 (tendencia). None si <2 años."""
+    yrs = [y for y in ("2024", "2025", "2026") if hist.get(y) is not None]
+    vals = [hist[y] for y in yrs]
+    if len(vals) < 2:
+        return None
+    delta = vals[-1] - vals[0]
+    col = "#16a34a" if delta < -3 else "#dc2626" if delta > 3 else AZUL   # bajó=más fácil, subió=más difícil
+    fig = go.Figure(go.Scatter(x=yrs, y=vals, mode="lines+markers+text",
+        text=[f"{v:.0f}" for v in vals], textposition="top center", textfont=dict(size=11, color=AZUL_OSC),
+        line=dict(color=col, width=3), marker=dict(size=9, color=col)))
+    fig.update_layout(height=200, margin=dict(l=10, r=14, t=42, b=6),
+        title=dict(text=f"📈 Corte de la carrera · {delta:+.0f} pts en 3 años", font=dict(size=13, color=AZUL_OSC)),
+        yaxis=dict(title="Corte (ponderado)", showgrid=True, gridcolor="#eef"),
+        xaxis=dict(showgrid=False), plot_bgcolor="white", paper_bgcolor="white",
+        yaxis_range=[min(vals) - 25, max(vals) + 30])
+    return fig
+
+
 def vac_total_de(row) -> float:
     """Vacantes 2026 totales (regular 1er+2º sem + admisión especial PACE/CDP/género)."""
     g = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
@@ -395,6 +414,11 @@ with cL:
                 + ponderaciones_html(row), unsafe_allow_html=True)
 with cR:
     st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
+    _ch = art.cortes_hist.get(str(cod))
+    if _ch:
+        _ftrend = fig_corte_trend(_ch)
+        if _ftrend is not None:
+            st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
 
 # titulación (contexto SIES 2024): match por carrera genérica, con fallback por área
 _tt = art.titulacion.get("por_carrera", {}).get(_norm(carrera_sel))
