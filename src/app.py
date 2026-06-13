@@ -125,20 +125,39 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
-def tabla_rank(rows, idx, incluir_carrera: bool, n: int = 15) -> pd.DataFrame:
-    """DataFrame para st.dataframe a partir del ranking (P desc, luego corte desc)."""
-    rr = sorted(rows, key=lambda d: (d["p"], d["corte"] or 0), reverse=True)[:n]
+def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
+               modo_orden: str = "alcanzo", n: int = 15, umbral: float = 0.5) -> pd.DataFrame:
+    """DataFrame para st.dataframe a partir del ranking.
+
+    modo_orden:
+      - "alcanzo": lo MEJOR que alcanzas → entre las que tienes ≥`umbral` de prob., ordena por
+        corte (selectividad) descendente. Si casi ninguna llega al umbral, cae a las más probables.
+      - "prob": las más probables primero (P desc, desempata por corte).
+    Las carreras sin corte histórico (nuevas) se marcan 🆕 y van al final en modo "alcanzo".
+    """
+    # carreras con corte (ranking confiable) primero; las nuevas (🆕) al final, su P es solo orientativa
+    con = [d for d in rows if d["corte"] is not None]
+    sin = sorted([d for d in rows if d["corte"] is None], key=lambda d: d["p"], reverse=True)
+    if modo_orden == "alcanzo":
+        cand = [d for d in con if d["p"] >= umbral]
+        base = (sorted(cand, key=lambda d: d["corte"], reverse=True) if len(cand) >= 3
+                else sorted(con, key=lambda d: d["p"], reverse=True))     # fallback: las más probables
+    else:
+        base = sorted(con, key=lambda d: (d["p"], d["corte"]), reverse=True)
+    rr = (base + sin)[:n]
     data = []
     for d in rr:
         c = idx.loc[d["cod"]]
+        nueva = d["corte"] is None
         fila = {}
         if incluir_carrera:
             fila["Carrera"] = str(c["NOMBRE_CARRERA"]).title()
-        fila["Universidad"] = str(c["NOMBRE_UNIVERSIDAD"]).title()
+        fila["Universidad"] = ("🆕 " if nueva else "") + str(c["NOMBRE_UNIVERSIDAD"]).title()
         fila["Región"] = str(c["reg_nom"])
         fila["P(acceso)"] = d["p"] * 100
         fila["Corte 2025"] = d["corte"]
-        fila["Tu margen"] = d["margen"]
+        if incluir_margen:
+            fila["Tu margen"] = d["margen"]
         data.append(fila)
     return pd.DataFrame(data)
 
@@ -416,23 +435,39 @@ with tab2:
                     unsafe_allow_html=True)
 
 with tab3:
-    st.caption("Con tus puntajes te muestro **dónde tienes más chance de quedar**: la misma carrera en "
-               "todas las universidades, y **carreras afines de tu área** (no te ofrezco cosas de otra área). "
-               "Ordenado por probabilidad de acceso **calibrada**.")
-    with st.container(border=True):
-        st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: C. Lectora y Matemática M1")
-        rc = st.columns(5)
-        r_clec = rc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="r_clec")
-        r_mate1 = rc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="r_mate1")
-        r_mate2 = rc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="r_mate2", help="0 si no rendiste")
-        r_hcsoc = rc[3].number_input("Historia", 0, 1000, 0, 5, key="r_hcsoc", help="0 si no rendiste")
-        r_cien = rc[4].number_input("Ciencias", 0, 1000, 0, 5, key="r_cien", help="0 si no rendiste")
-    solo_reg = st.checkbox(f"Mostrar solo en mi región ({L['region'].get(region, region)})", value=False, key="r_reg")
+    st.caption("Te muestro **dónde tienes más chance de quedar**: la misma carrera en todas las "
+               "universidades, y **carreras afines de tu área** (no te ofrezco cosas de otra área). "
+               "Probabilidades de acceso **calibradas**.")
+    modo_paes = st.radio("¿Ya rendiste la PAES?",
+                         ["✅ Sí — con mis puntajes (más preciso)", "🔮 Todavía no — con mis notas (PRE-PAES)"],
+                         horizontal=True, key="r_modo")
+    es_post = modo_paes.startswith("✅")
 
-    perfil_rec = replace(perfil_base, clec=r_clec, mate1=r_mate1,
-                         mate2=r_mate2 if r_mate2 >= 100 else None,
-                         hcsoc=r_hcsoc if r_hcsoc >= 100 else None,
-                         cien=r_cien if r_cien >= 100 else None)
+    if es_post:
+        with st.container(border=True):
+            st.markdown("**✏️ Tus puntajes PAES**  ·  obligatorias: C. Lectora y Matemática M1")
+            rc = st.columns(5)
+            r_clec = rc[0].number_input("C. Lectora", 100, 1000, 650, 5, key="r_clec")
+            r_mate1 = rc[1].number_input("Matemática M1", 100, 1000, 650, 5, key="r_mate1")
+            r_mate2 = rc[2].number_input("Matem. M2", 0, 1000, 0, 5, key="r_mate2", help="0 si no rendiste")
+            r_hcsoc = rc[3].number_input("Historia", 0, 1000, 0, 5, key="r_hcsoc", help="0 si no rendiste")
+            r_cien = rc[4].number_input("Ciencias", 0, 1000, 0, 5, key="r_cien", help="0 si no rendiste")
+        perfil_rec = replace(perfil_base, clec=r_clec, mate1=r_mate1,
+                             mate2=r_mate2 if r_mate2 >= 100 else None,
+                             hcsoc=r_hcsoc if r_hcsoc >= 100 else None,
+                             cien=r_cien if r_cien >= 100 else None)
+        modo_modelo = "post"
+    else:
+        st.info("🔮 Estimación **antes de la PAES**: usa las **notas y el contexto** de la sección 2 (arriba). "
+                "Es más incierta — el puntaje real puede mover bastante el resultado.")
+        perfil_rec = perfil_base
+        modo_modelo = "pre"
+
+    o1, o2 = st.columns([2, 1])
+    orden = o1.radio("Ordenar por", ["🏅 Lo mejor que alcanzo", "🎯 Más probable"], horizontal=True, key="r_orden")
+    modo_orden = "alcanzo" if orden.startswith("🏅") else "prob"
+    solo_reg = o2.checkbox(f"Solo en {L['region'].get(region, region)}", value=False, key="r_reg")
+
     area_sel = area_de(carrera_sel)
     sub_misma = cat[cat["CARRERA_U"] == carrera_sel]
     sub_area = cat[(cat["area"] == area_sel) & (cat["CARRERA_U"] != carrera_sel)] if area_sel else cat.iloc[0:0]
@@ -442,23 +477,23 @@ with tab3:
         sub_area = sub_area[sub_area["REGION_CASA_MATRIZ"].astype("Int64") == rint]
 
     st.markdown(f"<div class='sec'><h3>📍 {carrera_sel.title()} — dónde tienes más chance</h3></div>", unsafe_allow_html=True)
-    r_misma = rankear(art, perfil_rec, sub_misma["CODIGO_CARRERA"].tolist(), "post")
+    r_misma = rankear(art, perfil_rec, sub_misma["CODIGO_CARRERA"].tolist(), modo_modelo)
     if r_misma:
-        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False))
+        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False, incluir_margen=es_post, modo_orden=modo_orden))
     else:
         st.info("No hay universidades para mostrar con ese filtro.")
 
     if area_sel:
         st.markdown(f"<div class='sec'><h3>🧭 Otras carreras de tu área: {area_sel}</h3></div>", unsafe_allow_html=True)
-        r_area = rankear(art, perfil_rec, sub_area["CODIGO_CARRERA"].tolist(), "post")
+        r_area = rankear(art, perfil_rec, sub_area["CODIGO_CARRERA"].tolist(), modo_modelo)
         if r_area:
-            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True))
-            st.caption("Top 15 por probabilidad. El área se asigna según el nombre de la carrera; "
-                       "el margen usa el corte del año previo (las carreras sin corte histórico se omiten del cálculo de margen).")
+            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True, incluir_margen=es_post, modo_orden=modo_orden))
         else:
             st.info("No hay carreras afines para mostrar con ese filtro.")
     else:
-        st.caption("No pude clasificar el área de esta carrera, así que muestro solo la misma carrera en otras universidades.")
+        st.caption("No pude clasificar el área de esta carrera; muestro solo la misma carrera en otras universidades.")
+    st.caption("🏅 *Lo mejor que alcanzo* = entre las que tienes ≥50% de probabilidad, ordenadas de más a menos "
+               "selectiva. 🆕 = carrera nueva (sin corte histórico). La tabla es ordenable por cualquier columna.")
 
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
