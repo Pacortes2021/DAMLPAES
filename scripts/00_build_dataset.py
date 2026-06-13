@@ -211,8 +211,9 @@ def main():
     import pandas as pd
     of = pd.read_csv(OFERTA, sep=";", encoding="latin-1", decimal=".",
                      usecols=["CODIGO_CARRERA", "NOMBRE_CARRERA", "NOMBRE_UNIVERSIDAD",
-                              "REGION_CASA_MATRIZ", "VACANTES_1SEM", "VACANTES_2SEM", "PONDERADO_MINIMO",
-                              "%_NOTAS", "%_Ranking", "%_LENG", "%_MATE1", "%_MATE2",
+                              "REGION_CASA_MATRIZ", "VACANTES_1SEM", "VACANTES_2SEM",
+                              "CAR_VACANTES_PACE", "CDP_VACANTES_ESPECIALES", "VACANTES_GENERO",
+                              "PONDERADO_MINIMO", "%_NOTAS", "%_Ranking", "%_LENG", "%_MATE1", "%_MATE2",
                               "%_HYCS", "%_CIEN", "EXIGE_MATE2"])
     of["CODIGO_CARRERA"] = pd.to_numeric(of["CODIGO_CARRERA"], errors="coerce").astype("Int64")
     of = of.dropna(subset=["CODIGO_CARRERA"])

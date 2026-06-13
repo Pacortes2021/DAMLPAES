@@ -123,7 +123,7 @@ def fig_cf(dprob, titulo, color):
     return fig
 
 
-def historia_carrera(mtr: dict, v2: float, vac_total: float) -> str:
+def historia_carrera(mtr: dict, v2: float, vac_total: float, vac_esp: float = 0.0) -> str:
     """Narrativa en lenguaje natural del embudo de la carrera (postulan → quedan → se matriculan
     → total), año 2026. Devuelve HTML (.nota) o '' si no hay datos suficientes."""
     if not mtr:
@@ -146,10 +146,12 @@ def historia_carrera(mtr: dict, v2: float, vac_total: float) -> str:
     if ntot > 0:
         ctx = ""
         if ntot > nsm:
-            ctx = " (sumando a quienes entraron por otras preferencias" + (" y en 2º semestre" if v2 > 0 else "") + ")"
+            extras = ["otras preferencias"] + (["2º semestre"] if v2 > 0 else []) \
+                + (["vías especiales como PACE"] if vac_esp > 0 else [])
+            ctx = " (sumando a quienes entraron por " + ", ".join(extras) + ")"
         cola = f"en total la carrera matriculó a <b>{m(ntot)}</b> personas{ctx}"
         if vac_total > 0:
-            cola += f", sobre <b>{m(vac_total)}</b> vacantes"
+            cola += f", sobre <b>{m(vac_total)}</b> vacantes en total"
         partes.append(cola)
     if not partes:
         return ""
@@ -231,22 +233,24 @@ cL, cR = st.columns([1, 1])
 with cL:
     corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
     cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
-    v1 = row.get("VACANTES_1SEM"); v2 = row.get("VACANTES_2SEM")
-    v1 = 0.0 if (v1 is None or v1 != v1) else float(v1)
-    v2 = 0.0 if (v2 is None or v2 != v2) else float(v2)
-    vac_total = v1 + v2
+    _vac = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
+    v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
+    vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
+    vac_total = v1 + v2 + vac_esp          # todas las vías de admisión (regular + especiales)
     vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
     st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
                 f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Sel. 2025</div></div>"
                 f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                 unsafe_allow_html=True)
+    desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
+        + ([f"{int(vac_esp)} (admisión especial: PACE/otros)"] if vac_esp > 0 else [])
     st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}"
-               + (f" · 🗓️ vacantes = {int(v1)} (1er sem) + {int(v2)} (2º sem)" if v2 > 0 else ""))
+               + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
     mtr = art.matricula.get(str(cod))
-    historia = historia_carrera(mtr, v2, vac_total) if mtr else ""
+    historia = historia_carrera(mtr, v2, vac_total, vac_esp) if mtr else ""
     if historia:
         st.markdown(historia, unsafe_allow_html=True)
     st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
