@@ -195,12 +195,17 @@ cL, cR = st.columns([1, 1])
 with cL:
     corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
     cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
-    vac_txt = f"{int(row['VACANTES_1SEM'])}" if row['VACANTES_1SEM'] == row['VACANTES_1SEM'] else "s/d"
+    v1 = row.get("VACANTES_1SEM"); v2 = row.get("VACANTES_2SEM")
+    v1 = 0.0 if (v1 is None or v1 != v1) else float(v1)
+    v2 = 0.0 if (v2 is None or v2 != v2) else float(v2)
+    vac_total = v1 + v2
+    vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
     st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
                 f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Sel. 2025</div></div>"
                 f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                 unsafe_allow_html=True)
-    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}")
+    st.caption(f"📍 {row['UNIV_U']} · Región {row['reg_nom']} · código {cod}"
+               + (f" · 🗓️ vacantes = {int(v1)} (1er sem) + {int(v2)} (2º sem)" if v2 > 0 else ""))
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
