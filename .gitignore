@@ -16,6 +16,7 @@ data/processed/*
 !data/processed/labels.json
 !data/processed/conversiones.json
 !data/processed/territorio_stats.json
+!data/processed/matricula_stats.json
 
 # ── Código/artefactos archivados (referencia local, no al repo) ──
 legacy/

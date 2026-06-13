@@ -48,6 +48,7 @@ scripts/
   01_build_models.py      Entrenamiento + validación temporal + calibración → models/*.joblib
   02_build_score_model.py Predicción de puntaje PAES por prueba (regresión por cuantiles)
   03_analisis_determinantes.py  Análisis formal: brechas por origen + OLS + figuras (informe)
+  04_matricula_stats.py   Matrícula efectiva por carrera (cruce admisión↔matrícula por ID_aux)
 src/
   inference.py            Lógica de predicción (ponderado, encoding, predict) — sin Streamlit
   app.py                  Dashboard Streamlit (predictor de acceso PRE/POST-PAES)

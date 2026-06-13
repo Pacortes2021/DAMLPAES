@@ -204,6 +204,12 @@ with cL:
     if st_info is None:
         st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
                     unsafe_allow_html=True)
+    mtr = art.matricula.get(str(cod))
+    if mtr and mtr.get("tasa") is not None and mtr["n_sel"] > 0:
+        poco = " <i>(pocos casos, referencial)</i>" if mtr["n_sel"] < 20 else ""
+        st.markdown(f"<div class='nota'>📋 <b>Matrícula efectiva {mtr['anio']}:</b> de los <b>{mtr['n_sel']}</b> "
+                    f"seleccionados en 1ª preferencia, el <b>{mtr['tasa']:.0%}</b> se matriculó en esta carrera. "
+                    f"Matriculados totales: <b>{mtr['n_matric_total']}</b>.{poco}</div>", unsafe_allow_html=True)
     st.markdown("<div style='margin-top:12px'><b style='color:#1e3a8a'>⚖️ Ponderación por prueba (%)</b><br>"
                 "<span style='color:#64748b;font-size:.82rem'>en azul, las 4 obligatorias · Historia/Ciencias es electivo (se cuenta el mejor)</span></div>"
                 + ponderaciones_html(row), unsafe_allow_html=True)
@@ -342,6 +348,12 @@ with st.expander("ℹ️ Sobre los modelos y los datos"):
 **Validación temporal (entrena 2025 → testea 2026):**
 - Acceso POST-PAES — AUC **{mt['auc_roc']:.3f}** · Acceso PRE-PAES — AUC **{mp['auc_roc']:.3f}**
 - Puntaje probable por prueba (cuantiles): cobertura P10–P90 entre **{min(v['cobertura_p10_p90'] for v in sc.values()):.0%} y {max(v['cobertura_p10_p90'] for v in sc.values()):.0%}** (objetivo 80%)
+
+**Matrícula efectiva (descriptivo, no es target):** cruzando admisión ↔ matrícula 2026 por estudiante
+(`ID_aux`), muestra qué % de los **seleccionados** en 1ª preferencia **efectivamente se matriculó** en esa
+carrera. El modelo predice la *selección* (hacer match con la carrera); matricularse o no es decisión del
+postulante, por eso esta cifra se reporta como contexto, no como variable objetivo. Los matriculados totales
+pueden superar a los seleccionados (ingresos vía lista de espera u otras preferencias).
 
 **Cómo se predice el puntaje (percentiles, en simple):** no es una fórmula. Para cada prueba entrenamos un
 modelo de *regresión por cuantiles* (gradient boosting) que aprende, a partir de **notas + contexto**, no un

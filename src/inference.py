@@ -34,6 +34,12 @@ class Artifacts:
     score_models: dict               # {prueba: {q10,q50,q90}} regresores de puntaje por prueba
     meta_score: dict
     territorio: dict                  # tasas históricas de acceso por región/comuna
+    matricula: dict                   # matrícula efectiva por carrera (descriptivo, no es target)
+
+
+def _load_json_opt(path, default):
+    """Carga un JSON si existe; si no, devuelve default (artefacto opcional)."""
+    return json.load(open(path)) if os.path.exists(path) else default
 
 
 def load_artifacts() -> Artifacts:
@@ -52,6 +58,7 @@ def load_artifacts() -> Artifacts:
                       for t in meta_score["pruebas"]},
         meta_score=meta_score,
         territorio=json.load(open(_P("data/processed/territorio_stats.json"))),
+        matricula=_load_json_opt(_P("data/processed/matricula_stats.json"), {}),
     )
 
 
