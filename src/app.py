@@ -155,6 +155,38 @@ def fig_corte_trend(hist: dict):
     return fig
 
 
+def fig_pie_genero(s, titulo):
+    """Torta de proporción por género de los titulados."""
+    pm, ph = s["pct_muj"], s["pct_hom"]
+    resto = max(0.0, 100 - pm - ph)
+    labels, vals, cols = ["Mujeres", "Hombres"], [pm, ph], ["#ec4899", "#2563eb"]
+    if resto > 0.5:
+        labels.append("Otro/NB"); vals.append(resto); cols.append("#94a3b8")
+    fig = go.Figure(go.Pie(labels=labels, values=vals, marker_colors=cols, hole=.45, sort=False,
+        textinfo="label+percent", textfont=dict(size=11, color="white"),
+        hovertemplate="%{label}: %{percent}<extra></extra>"))
+    fig.update_layout(height=215, margin=dict(l=6, r=6, t=40, b=6), showlegend=False,
+        title=dict(text=titulo, font=dict(size=12, color=AZUL_OSC)), paper_bgcolor="white")
+    return fig
+
+
+def tit_fila(etiqueta, s) -> dict:
+    return {" ": etiqueta, "Titulados": s["n"], "% Mujeres": s["pct_muj"], "% Hombres": s["pct_hom"],
+            "Edad prom.": s["edad_prom"], "Edad mediana": s["edad_mediana"]}
+
+
+def match_titulacion(nombre: str, por_carrera: dict) -> str | None:
+    """Calza el nombre DEMRE (con sufijos de campus/menciones) con la carrera genérica SIES:
+    exacto → sin sufijo '(...)'/'- ...' → clave SIES más larga contenida en el nombre."""
+    if nombre in por_carrera:
+        return nombre
+    base = nombre.split(" (")[0].split(" - ")[0].strip()
+    if base in por_carrera:
+        return base
+    cands = [k for k in por_carrera if k in nombre]
+    return max(cands, key=len) if cands else None
+
+
 def vac_total_de(row) -> float:
     """Vacantes 2026 totales (regular 1er+2º sem + admisión especial PACE/CDP/género)."""
     g = lambda c: (lambda x: 0.0 if (x is None or x != x) else float(x))(row.get(c))
@@ -360,9 +392,9 @@ Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · G
 # ----------------------------------------------------------------- 1 · CARRERA (página principal)
 cat = art.catalogo.copy()
 cat["reg_nom"] = cat["REGION_CASA_MATRIZ"].astype("Int64").astype(str).map(L["region"]).fillna("")
-# normalización a MAYÚSCULAS: unifica "Ingeniería" e "INGENIERÍA" (mismo nombre, distinta caja)
-cat["CARRERA_U"] = cat["NOMBRE_CARRERA"].fillna("¿?").str.upper().str.strip()
-cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").str.upper().str.strip()
+# normalización a MAYÚSCULAS SIN TILDES: unifica "Ingeniería"/"INGENIERIA"/"INGENIERÍA"
+cat["CARRERA_U"] = cat["NOMBRE_CARRERA"].fillna("¿?").map(_norm)
+cat["UNIV_U"] = cat["NOMBRE_UNIVERSIDAD"].fillna("¿?").map(_norm)
 # desambiguación de universidad: universidad · región (cód) — cada opción mapea a UN código
 cat["univ_display"] = (cat["UNIV_U"] + " · " + cat["reg_nom"].str.upper()
                        + "  (cód " + cat["CODIGO_CARRERA"].astype(str) + ")")
@@ -420,22 +452,32 @@ with cR:
         if _ftrend is not None:
             st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
 
-# titulación (contexto SIES 2024): match por carrera genérica, con fallback por área
-_tt = art.titulacion.get("por_carrera", {}).get(_norm(carrera_sel))
-_tfuente = f"<b>{carrera_sel.title()}</b>"
+# titulación (contexto SIES 2024): total (carrera o área) + tu universidad, con tabla y tortas
+_tnorm = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
+_tt = art.titulacion.get("por_carrera", {}).get(_tnorm) if _tnorm else None
+_tlabel = "Todas las universidades"
 if not _tt:
     _tarea = area_de(carrera_sel)
     _tt = art.titulacion.get("por_area", {}).get(_tarea)
-    _tfuente = f"el área <b>{_tarea}</b>" if _tarea else None
-if _tt and _tfuente:
-    _pm = _tt["pct_muj"]
-    _edad = f" · edad promedio de titulación <b>{_tt['edad']:.0f} años</b>" if _tt.get("edad") else ""
-    _gap = " — fuerte predominio <b>femenino</b>" if _pm >= 68 else (" — fuerte predominio <b>masculino</b>" if _pm <= 32 else "")
-    _n = f"{_tt['n']:,}".replace(",", ".")
-    st.markdown(f"<div class='nota'>🎓 <b>Titulación (2024):</b> {_tfuente} tituló a <b>{_n}</b> personas — "
-                f"<b>{_pm:.0f}% mujeres</b> / {100-_pm:.0f}% hombres{_edad}{_gap}. "
-                f"<span style='color:#64748b;font-size:.86em'>(SIES, agregado nacional)</span></div>",
-                unsafe_allow_html=True)
+    _tlabel = f"Tu área: {_tarea}" if _tarea else None
+_tu = art.titulacion.get("por_carrera_inst", {}).get(_tnorm, {}).get(str(row["UNIV_U"])) if _tt else None
+if _tt and _tlabel:
+    st.markdown("<div class='sec'><h3>🎓 Titulación de la carrera (SIES 2024)</h3></div>", unsafe_allow_html=True)
+    _filas = [tit_fila(_tlabel, _tt)] + ([tit_fila(str(row["UNIV_U"]).title(), _tu)] if _tu else [])
+    st.dataframe(pd.DataFrame(_filas), hide_index=True, width="stretch", column_config={
+        "Titulados": st.column_config.NumberColumn(format="%d"),
+        "% Mujeres": st.column_config.NumberColumn(format="%.0f%%"),
+        "% Hombres": st.column_config.NumberColumn(format="%.0f%%"),
+        "Edad prom.": st.column_config.NumberColumn(format="%.0f años", help="Promedio (lo infla la cola de titulados mayores)"),
+        "Edad mediana": st.column_config.NumberColumn(format="%.0f años", help="Más representativa: la mitad se titula antes de esta edad")})
+    _pcols = st.columns(2 if _tu else 1)
+    _pcols[0].plotly_chart(fig_pie_genero(_tt, _tlabel), use_container_width=True, key="pie_tot")
+    if _tu:
+        _pcols[1].plotly_chart(fig_pie_genero(_tu, str(row["UNIV_U"]).title()), use_container_width=True, key="pie_uni")
+    st.caption("💡 La **mediana** de edad es más representativa que el promedio (la cola de titulados mayores "
+               "infla el promedio). Cifras agregadas nacionales del SIES; "
+               + ("incluye solo tu universidad cuando hay match de nombre." if _tu else
+                  "no se encontró tu universidad específica en los datos de esta carrera."))
 
 # ----------------------------------------------------------------- 2 · PERFIL (página principal)
 st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
@@ -507,6 +549,28 @@ with tab1:
                    "la mitad menos). El extremo izquierdo (P10) es un escenario bajo y el derecho (P90) uno alto. "
                    "La banda es ancha porque el puntaje no está determinado por tu perfil — el origen lo *desplaza*, no lo fija. "
                    "Las pruebas electivas se muestran como referencia *si las rindes*.")
+
+    # puntaje ponderado ESTIMADO: combina los puntajes PAES probables (banda) con las notas,
+    # usando las ponderaciones de la carrera. Rango P10–P90 + margen vs el corte.
+    def _pond_q(q):
+        pp = replace(perfil_base, clec=banda["CLEC"][q], mate1=banda["MATE1"][q],
+                     mate2=banda.get("MATE2", {}).get(q), hcsoc=banda.get("HCSOC", {}).get(q),
+                     cien=banda.get("CIEN", {}).get(q))
+        return predecir(art, pp)["ponderado"]
+    _pe = _pond_q("p50") if (banda and res["p_pre"] is not None) else None
+    if _pe is not None:
+        _plo, _phi = _pond_q("p10"), _pond_q("p90")
+        _corte = res["corte"]
+        _me = (_pe - _corte) if _corte else None
+        mm = st.columns(3)
+        mm[0].metric("🎯 Ponderado estimado", f"{_pe:.0f}",
+                     help=f"Tu puntaje ponderado probable, con los puntajes PAES que predice el modelo. Rango P10–P90: {_plo:.0f}–{_phi:.0f}")
+        mm[1].metric("Corte 2025", f"{_corte:.0f}" if _corte else "s/d")
+        if _me is not None:
+            mm[2].metric("Margen estimado", f"{_me:+.0f}", delta=f"{_me:+.0f}")
+        st.caption(f"📐 Tu **ponderado estimado** es **~{_pe:.0f}** (rango {_plo:.0f}–{_phi:.0f} según el puntaje PAES probable). "
+                   + (f"Frente al corte 2025 ({_corte:.0f}), tu margen estimado es **{_me:+.0f}**." if _me is not None
+                      else "Carrera sin corte histórico, no se puede estimar el margen."))
 
     st.markdown("<div class='sec'><h3>🔬 El efecto del origen (mismas notas, distinto colegio)</h3></div>",
                 unsafe_allow_html=True)
