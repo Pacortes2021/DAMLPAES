@@ -239,7 +239,7 @@ with cL:
     vac_total = v1 + v2 + vac_esp          # todas las vías de admisión (regular + especiales)
     vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
     st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
-                f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Sel. 2025</div></div>"
+                f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron 2025</div></div>"
                 f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                 unsafe_allow_html=True)
     desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
