@@ -266,7 +266,7 @@ def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
 
 
 def mostrar_tabla(df: pd.DataFrame):
-    st.dataframe(df, hide_index=True, use_container_width=True, column_config={
+    st.dataframe(df, hide_index=True, width="stretch", column_config={
         "P(acceso)": st.column_config.ProgressColumn("Prob. acceso", min_value=0, max_value=100,
                                                      format="%.0f%%", help="Probabilidad calibrada (POST-PAES)"),
         "Corte 2025": st.column_config.NumberColumn("Corte 2025", format="%.0f"),
