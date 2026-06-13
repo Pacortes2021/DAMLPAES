@@ -1,0 +1,6 @@
+# Para re-correr el PIPELINE de datos/modelos localmente (scripts/00a..06).
+# Incluye las del dashboard + las extra que solo usan los scripts (NO el deploy).
+-r requirements.txt
+polars==1.36.1
+matplotlib>=3.8
+openpyxl>=3.1
