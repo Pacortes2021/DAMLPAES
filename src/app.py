@@ -245,6 +245,31 @@ def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
     return fig
 
 
+def fig_mapa_puntaje(territorio, cent, comuna_sel, L):
+    """Mapa de puntos por comuna coloreado por PUNTAJE PAES promedio (alto contraste territorial)."""
+    lons, lats, vals, txt, sizes = [], [], [], [], []
+    for code, c in cent.items():
+        s = territorio["comuna"].get(code)
+        if s and s.get("puntaje") and s["n"] >= 30:
+            lons.append(c["lon"]); lats.append(c["lat"]); vals.append(s["puntaje"])
+            sizes.append(6 + min(10, s["n"] ** 0.5 / 12))
+            txt.append(f"<b>{L['comuna'].get(code, code)}</b><br>Puntaje PAES: {s['puntaje']:.0f}<br>n={s['n']:,}")
+    fig = go.Figure(go.Scattergeo(lon=lons, lat=lats, mode="markers",
+        marker=dict(size=sizes, color=vals, colorscale="RdYlGn", cmin=min(vals), cmax=max(vals),
+                    showscale=True, colorbar=dict(title="Puntaje", thickness=12, len=.55, x=0, xanchor="left"),
+                    line=dict(width=.3, color="white"), opacity=.85),
+        text=txt, hovertemplate="%{text}<extra></extra>"))
+    cc = cent.get(str(comuna_sel))
+    if cc:
+        fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers",
+            marker=dict(size=16, color="rgba(0,0,0,0)", line=dict(width=3, color="#1e3a8a")),
+            hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
+    fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
+                    lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
+    fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
+    return fig
+
+
 def fig_barras_region(territorio, region_sel, L):
     """Ranking horizontal de tasa de acceso por región; tu región en naranjo."""
     items = sorted(((L["region"].get(str(c), str(c)), s["tasa"] * 100, str(c))
@@ -525,8 +550,69 @@ if tr_reg:
 perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=promedio, porc_sup=porc_sup,
                      region=region, comuna=comuna, dependencia=dependencia, rama=rama)
 
+# ----------------------------------------------------------------- VEREDICTO unificado
+st.markdown("<div class='sec'><h3>🧭 Tu veredicto (antes de la PAES)</h3></div>", unsafe_allow_html=True)
+_vres = predecir(art, perfil_base)
+_vbanda = predecir_puntaje(art, perfil_base)
+
+
+def _ver_escenario(q):
+    pp = replace(perfil_base, clec=_vbanda["CLEC"][q], mate1=_vbanda["MATE1"][q],
+                 mate2=_vbanda.get("MATE2", {}).get(q), hcsoc=_vbanda.get("HCSOC", {}).get(q),
+                 cien=_vbanda.get("CIEN", {}).get(q))
+    r = predecir(art, pp)
+    return r["ponderado"], r["p_post"]
+
+
+if _vres["p_pre"] is None:
+    st.info("Completa **NEM/notas y ranking/%superior** en la sección 2 para ver tu veredicto.")
+else:
+    _ppre = _vres["p_pre"]
+    _pond50, _ = _ver_escenario("p50")
+    _, _plo = _ver_escenario("p10")
+    _, _phi = _ver_escenario("p90")
+    _corte = _vres["corte"]
+    _gap = (_corte - _pond50) if (_corte and _pond50 is not None) else None
+    vc1, vc2 = st.columns([1, 1.35])
+    with vc1:
+        st.plotly_chart(gauge(_ppre, "Probabilidad de acceso (PRE)"), use_container_width=True, key="ver_gauge")
+    with vc2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        _vm = st.columns(3)
+        _vm[0].metric("🎯 Ponderado estimado", f"{_pond50:.0f}" if _pond50 is not None else "s/d")
+        _vm[1].metric("Corte 2025", f"{_corte:.0f}" if _corte else "s/d")
+        if _gap is not None:
+            _vm[2].metric("Margen estimado", f"{-_gap:+.0f}", delta=f"{-_gap:+.0f}")
+        if _gap is not None and _gap > 0:
+            st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado estimado (~{_pond50:.0f}) está "
+                        f"<b>{_gap:.0f} pts bajo el corte</b> ({_corte:.0f}) → necesitarías subir <b>~{_gap:.0f} pts "
+                        f"en cada prueba</b> para quedar en la línea.</div>", unsafe_allow_html=True)
+        elif _gap is not None:
+            st.markdown(f"<div class='nota'>✅ <b>Vas bien:</b> tu ponderado estimado (~{_pond50:.0f}) <b>supera el corte</b> "
+                        f"({_corte:.0f}) por ~{-_gap:.0f} pts. Igual depende de cómo rindas.</div>", unsafe_allow_html=True)
+        if _plo is not None and _phi is not None:
+            st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> si rindes <b>bajo</b> (P10) tu probabilidad sería "
+                        f"~<b>{_plo:.0%}</b>; si rindes <b>alto</b> (P90), ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>",
+                        unsafe_allow_html=True)
+    # resumen exportable
+    _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
+    _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
+    _lineas = [f"MI RESULTADO — {carrera_sel.title()} · {str(row['UNIV_U']).title()}",
+               f"Región/comuna: {L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}", "",
+               f"Probabilidad de acceso (PRE-PAES): {_ppre:.0%}",
+               f"Ponderado estimado: ~{_pond50:.0f}" if _pond50 is not None else "Ponderado estimado: s/d"]
+    if _corte and _pond50 is not None:
+        _lineas.append(f"Corte 2025: {_corte:.0f}  ·  margen estimado: {(_pond50-_corte):+.0f}")
+    if _plo is not None:
+        _lineas.append(f"Rango de probabilidad según PAES: {_plo:.0%} (bajo) a {_phi:.0%} (alto)")
+    if _tq:
+        _lineas.append(f"Titulación: {_tq['pct_muj']:.0f}% mujeres · edad mediana {_tq['edad_mediana']:.0f} años")
+    _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía de admisión."]
+    st.download_button("📄 Descargar mi resumen", data="\n".join(_lineas),
+                       file_name="mi_resultado_PAES.txt", key="dl_resumen")
+
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
-st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
+st.markdown("<div class='sec'><h3>3 · Resultados (detalle)</h3></div>", unsafe_allow_html=True)
 tab1, tab2, tab3, tab_comp, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
                                             "🔎 ¿Dónde puedo quedar?", "⚖️ Comparar carreras",
                                             "🗺️ Mapa territorial"])
@@ -549,28 +635,6 @@ with tab1:
                    "la mitad menos). El extremo izquierdo (P10) es un escenario bajo y el derecho (P90) uno alto. "
                    "La banda es ancha porque el puntaje no está determinado por tu perfil — el origen lo *desplaza*, no lo fija. "
                    "Las pruebas electivas se muestran como referencia *si las rindes*.")
-
-    # puntaje ponderado ESTIMADO: combina los puntajes PAES probables (banda) con las notas,
-    # usando las ponderaciones de la carrera. Rango P10–P90 + margen vs el corte.
-    def _pond_q(q):
-        pp = replace(perfil_base, clec=banda["CLEC"][q], mate1=banda["MATE1"][q],
-                     mate2=banda.get("MATE2", {}).get(q), hcsoc=banda.get("HCSOC", {}).get(q),
-                     cien=banda.get("CIEN", {}).get(q))
-        return predecir(art, pp)["ponderado"]
-    _pe = _pond_q("p50") if (banda and res["p_pre"] is not None) else None
-    if _pe is not None:
-        _plo, _phi = _pond_q("p10"), _pond_q("p90")
-        _corte = res["corte"]
-        _me = (_pe - _corte) if _corte else None
-        mm = st.columns(3)
-        mm[0].metric("🎯 Ponderado estimado", f"{_pe:.0f}",
-                     help=f"Tu puntaje ponderado probable, con los puntajes PAES que predice el modelo. Rango P10–P90: {_plo:.0f}–{_phi:.0f}")
-        mm[1].metric("Corte 2025", f"{_corte:.0f}" if _corte else "s/d")
-        if _me is not None:
-            mm[2].metric("Margen estimado", f"{_me:+.0f}", delta=f"{_me:+.0f}")
-        st.caption(f"📐 Tu **ponderado estimado** es **~{_pe:.0f}** (rango {_plo:.0f}–{_phi:.0f} según el puntaje PAES probable). "
-                   + (f"Frente al corte 2025 ({_corte:.0f}), tu margen estimado es **{_me:+.0f}**." if _me is not None
-                      else "Carrera sin corte histórico, no se puede estimar el margen."))
 
     st.markdown("<div class='sec'><h3>🔬 El efecto del origen (mismas notas, distinto colegio)</h3></div>",
                 unsafe_allow_html=True)
@@ -742,25 +806,39 @@ with tab_comp:
                         use_container_width=True, key="comp_radar")
 
 with tab4:
-    st.caption("**Tasa histórica de acceso a 1ª preferencia** por territorio (todas las carreras, "
-               "modalidad regular). Tu **región** va resaltada en naranjo 🟠 y tu **comuna** marcada en rojo 🔴.")
+    metrica = st.radio("Colorear el mapa por", ["🎯 Tasa de acceso (región)", "📈 Puntaje PAES (comuna)"],
+                       horizontal=True, key="mapa_metrica")
+    es_puntaje = metrica.startswith("📈")
     geo, cent = get_geo()
+    if es_puntaje:
+        st.caption("**Puntaje PAES promedio (CLEC+M1)/2 por comuna** — revela la **brecha territorial**: el origen "
+                   "condiciona el puntaje (origen → puntaje → acceso). Tu comuna va con borde azul 🔵.")
+    else:
+        st.caption("**Tasa histórica de acceso a 1ª preferencia** por región. Tu **región** en naranjo 🟠 y tu "
+                   "**comuna** en rojo 🔴.")
     mc1, mc2 = st.columns([1, 1.15])
     with mc1:
-        st.plotly_chart(fig_mapa(art.territorio, geo, cent, region, comuna, L), use_container_width=True, key="mapa")
+        if es_puntaje:
+            st.plotly_chart(fig_mapa_puntaje(art.territorio, cent, comuna, L), use_container_width=True, key="mapa_pje")
+        else:
+            st.plotly_chart(fig_mapa(art.territorio, geo, cent, region, comuna, L), use_container_width=True, key="mapa")
     with mc2:
         st.plotly_chart(fig_barras_region(art.territorio, region, L), use_container_width=True, key="barras_reg")
     tr_reg = art.territorio["region"].get(str(region))
     tr_com = art.territorio["comuna"].get(str(comuna))
     cols = st.columns(3)
-    if tr_reg:
-        cols[0].metric(f"🟠 {L['region'].get(region, region).replace('Region ', '')}", f"{tr_reg['tasa']:.0%}", help=f"n={tr_reg['n']:,}")
-    if tr_com:
-        cols[1].metric(f"🔴 {L['comuna'].get(comuna, comuna)}", f"{tr_com['tasa']:.0%}", help=f"n={tr_com['n']:,}")
-    prom = sum(s["tasa"] * s["n"] for s in art.territorio["region"].values()) / sum(s["n"] for s in art.territorio["region"].values())
-    cols[2].metric("📊 Promedio nacional", f"{prom:.0%}")
-    st.caption("Es la tasa de acceso de **todas las carreras** de cada territorio (contexto socioterritorial), "
-               "no la de una carrera puntual. Útil para ver brechas geográficas de acceso.")
+    if es_puntaje and tr_com and tr_com.get("puntaje"):
+        cols[0].metric(f"🔵 {L['comuna'].get(comuna, comuna)} (puntaje)", f"{tr_com['puntaje']:.0f}")
+        pjes = [s["puntaje"] for s in art.territorio["comuna"].values() if s.get("puntaje")]
+        cols[1].metric("📊 Mediana nacional (comunas)", f"{sorted(pjes)[len(pjes)//2]:.0f}")
+        cols[2].metric("↔️ Brecha máx-mín comuna", f"{max(pjes)-min(pjes):.0f} pts")
+    else:
+        if tr_reg:
+            cols[0].metric(f"🟠 {L['region'].get(region, region).replace('Region ', '')}", f"{tr_reg['tasa']:.0%}", help=f"n={tr_reg['n']:,}")
+        if tr_com:
+            cols[1].metric(f"🔴 {L['comuna'].get(comuna, comuna)}", f"{tr_com['tasa']:.0%}", help=f"n={tr_com['n']:,}")
+        prom = sum(s["tasa"] * s["n"] for s in art.territorio["region"].values()) / sum(s["n"] for s in art.territorio["region"].values())
+        cols[2].metric("📊 Promedio nacional", f"{prom:.0%}")
 
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
