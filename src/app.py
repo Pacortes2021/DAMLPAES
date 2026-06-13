@@ -9,6 +9,7 @@ Ejecutar:  python3 -m streamlit run src/app.py
 """
 from __future__ import annotations
 from dataclasses import replace
+import json, os
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
@@ -46,6 +47,16 @@ st.markdown(f"""
   .stTabs [aria-selected="true"] {{color:{AZUL}!important;}}
 </style>
 """, unsafe_allow_html=True)
+
+
+_GEO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "geo")
+
+
+@st.cache_data
+def get_geo():
+    geo = json.load(open(os.path.join(_GEO, "regiones.geojson")))
+    cent = json.load(open(os.path.join(_GEO, "comuna_centroides.json")))
+    return geo, cent
 
 
 @st.cache_resource
@@ -122,6 +133,51 @@ def fig_cf(dprob, titulo, color):
     fig.update_layout(height=max(170, 42*len(items)+50), margin=dict(l=8, r=30, t=34, b=8),
         title=dict(text=titulo, font=dict(size=13, color=AZUL_OSC)),
         xaxis=dict(range=[0, 108], ticksuffix="%", showgrid=False), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
+def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
+    """Coroplético de Chile por tasa de acceso (región) + tu región resaltada + tu comuna marcada."""
+    codes = [f["properties"]["codregion"] for f in geo["features"]]
+    z, txt = [], []
+    for c in codes:
+        s = territorio["region"].get(str(c))
+        nom = L["region"].get(str(c), str(c))
+        z.append(s["tasa"] * 100 if s else None)
+        txt.append(f"<b>{nom}</b><br>Acceso 1ª pref: {s['tasa']:.0%}<br>n={s['n']:,}" if s else f"<b>{nom}</b><br>s/d")
+    zz = [v for v in z if v is not None]
+    fig = go.Figure(go.Choropleth(
+        geojson=geo, locations=codes, featureidkey="properties.codregion", z=z,
+        colorscale="Blues", zmin=min(zz), zmax=max(zz), marker_line_color="white", marker_line_width=.5,
+        colorbar=dict(title="% acceso", thickness=12, len=.55, x=.0, xanchor="left"),
+        text=txt, hovertemplate="%{text}<extra></extra>"))
+    if region_sel:                                      # resaltar tu región (borde naranjo)
+        fig.add_trace(go.Choropleth(geojson=geo, locations=[int(region_sel)],
+            featureidkey="properties.codregion", z=[0], showscale=False,
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            marker_line_color="#f59e0b", marker_line_width=3, hoverinfo="skip"))
+    cc = cent.get(str(comuna_sel))                      # marcar tu comuna (punto rojo)
+    if cc:
+        fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers",
+            marker=dict(size=11, color="#dc2626", line=dict(width=2, color="white")),
+            hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
+    fig.update_geos(fitbounds="locations", visible=False, bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
+    return fig
+
+
+def fig_barras_region(territorio, region_sel, L):
+    """Ranking horizontal de tasa de acceso por región; tu región en naranjo."""
+    items = sorted(((L["region"].get(str(c), str(c)), s["tasa"] * 100, str(c))
+                    for c, s in territorio["region"].items()), key=lambda x: x[1])
+    cols = ["#f59e0b" if c == str(region_sel) else "#bcd4f6" for _, _, c in items]
+    fig = go.Figure(go.Bar(x=[v for _, v, _ in items], y=[n.replace("Region ", "") for n, _, _ in items],
+        orientation="h", marker_color=cols, text=[f"{v:.0f}%" for _, v, _ in items],
+        textposition="outside", textfont=dict(size=10, color=AZUL_OSC)))
+    fig.update_layout(height=640, margin=dict(l=8, r=24, t=30, b=8),
+        title=dict(text="Acceso a 1ª preferencia por región", font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(range=[0, max(v for _, v, _ in items) * 1.18], ticksuffix="%", showgrid=True, gridcolor="#eef"),
+        yaxis=dict(tickfont=dict(size=10)), plot_bgcolor="white", paper_bgcolor="white")
     return fig
 
 
@@ -358,7 +414,8 @@ perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=p
 
 # ----------------------------------------------------------------- 3 · RESULTADOS (pestañas)
 st.markdown("<div class='sec'><h3>3 · Resultados</h3></div>", unsafe_allow_html=True)
-tab1, tab2, tab3 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES", "🔎 ¿Dónde puedo quedar?"])
+tab1, tab2, tab3, tab4 = st.tabs(["🔮 Antes de la PAES", "✅ Después de la PAES",
+                                  "🔎 ¿Dónde puedo quedar?", "🗺️ Mapa territorial"])
 
 with tab1:
     st.caption("Estimación **antes de rendir**: el origen y las notas predicen qué puntaje PAES es probable "
@@ -494,6 +551,27 @@ with tab3:
         st.caption("No pude clasificar el área de esta carrera; muestro solo la misma carrera en otras universidades.")
     st.caption("🏅 *Lo mejor que alcanzo* = entre las que tienes ≥50% de probabilidad, ordenadas de más a menos "
                "selectiva. 🆕 = carrera nueva (sin corte histórico). La tabla es ordenable por cualquier columna.")
+
+with tab4:
+    st.caption("**Tasa histórica de acceso a 1ª preferencia** por territorio (todas las carreras, "
+               "modalidad regular). Tu **región** va resaltada en naranjo 🟠 y tu **comuna** marcada en rojo 🔴.")
+    geo, cent = get_geo()
+    mc1, mc2 = st.columns([1, 1.15])
+    with mc1:
+        st.plotly_chart(fig_mapa(art.territorio, geo, cent, region, comuna, L), use_container_width=True, key="mapa")
+    with mc2:
+        st.plotly_chart(fig_barras_region(art.territorio, region, L), use_container_width=True, key="barras_reg")
+    tr_reg = art.territorio["region"].get(str(region))
+    tr_com = art.territorio["comuna"].get(str(comuna))
+    cols = st.columns(3)
+    if tr_reg:
+        cols[0].metric(f"🟠 {L['region'].get(region, region).replace('Region ', '')}", f"{tr_reg['tasa']:.0%}", help=f"n={tr_reg['n']:,}")
+    if tr_com:
+        cols[1].metric(f"🔴 {L['comuna'].get(comuna, comuna)}", f"{tr_com['tasa']:.0%}", help=f"n={tr_com['n']:,}")
+    prom = sum(s["tasa"] * s["n"] for s in art.territorio["region"].values()) / sum(s["n"] for s in art.territorio["region"].values())
+    cols[2].metric("📊 Promedio nacional", f"{prom:.0%}")
+    st.caption("Es la tasa de acceso de **todas las carreras** de cada territorio (contexto socioterritorial), "
+               "no la de una carrera puntual. Útil para ver brechas geográficas de acceso.")
 
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
