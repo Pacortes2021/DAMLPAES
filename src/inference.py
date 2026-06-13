@@ -35,6 +35,7 @@ class Artifacts:
     meta_score: dict
     territorio: dict                  # tasas históricas de acceso por región/comuna
     matricula: dict                   # matrícula efectiva por carrera (descriptivo, no es target)
+    titulacion: dict                  # titulación por carrera/área (género, edad — descriptivo SIES 2024)
 
 
 def _load_json_opt(path, default):
@@ -59,6 +60,7 @@ def load_artifacts() -> Artifacts:
         meta_score=meta_score,
         territorio=json.load(open(_P("data/processed/territorio_stats.json"))),
         matricula=_load_json_opt(_P("data/processed/matricula_stats.json"), {}),
+        titulacion=_load_json_opt(_P("data/processed/titulacion_stats.json"), {"por_carrera": {}, "por_area": {}}),
     )
 
 

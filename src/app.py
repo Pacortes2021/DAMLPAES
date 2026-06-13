@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 from inference import load_artifacts, Perfil, predecir, predecir_puntaje, rankear
-from areas import area_de
+from areas import area_de, _norm
 
 st.set_page_config(page_title="¿Quedo en mi 1ª preferencia?", page_icon="🎓", layout="wide")
 AZUL, AZUL_OSC = "#2563eb", "#1e3a8a"
@@ -396,6 +396,23 @@ with cL:
 with cR:
     st.plotly_chart(fig_radar(row), use_container_width=True, key="radar_top")
 
+# titulación (contexto SIES 2024): match por carrera genérica, con fallback por área
+_tt = art.titulacion.get("por_carrera", {}).get(_norm(carrera_sel))
+_tfuente = f"<b>{carrera_sel.title()}</b>"
+if not _tt:
+    _tarea = area_de(carrera_sel)
+    _tt = art.titulacion.get("por_area", {}).get(_tarea)
+    _tfuente = f"el área <b>{_tarea}</b>" if _tarea else None
+if _tt and _tfuente:
+    _pm = _tt["pct_muj"]
+    _edad = f" · edad promedio de titulación <b>{_tt['edad']:.0f} años</b>" if _tt.get("edad") else ""
+    _gap = " — fuerte predominio <b>femenino</b>" if _pm >= 68 else (" — fuerte predominio <b>masculino</b>" if _pm <= 32 else "")
+    _n = f"{_tt['n']:,}".replace(",", ".")
+    st.markdown(f"<div class='nota'>🎓 <b>Titulación (2024):</b> {_tfuente} tituló a <b>{_n}</b> personas — "
+                f"<b>{_pm:.0f}% mujeres</b> / {100-_pm:.0f}% hombres{_edad}{_gap}. "
+                f"<span style='color:#64748b;font-size:.86em'>(SIES, agregado nacional)</span></div>",
+                unsafe_allow_html=True)
+
 # ----------------------------------------------------------------- 2 · PERFIL (página principal)
 st.markdown("<div class='sec'><h3>2 · Tu perfil</h3></div>", unsafe_allow_html=True)
 with st.container(border=True):
@@ -665,6 +682,10 @@ with st.expander("ℹ️ Sobre los modelos y los datos"):
 **Validación temporal (entrena 2025 → testea 2026):**
 - Acceso POST-PAES — AUC **{mt['auc_roc']:.3f}** · Acceso PRE-PAES — AUC **{mp['auc_roc']:.3f}**
 - Puntaje probable por prueba (cuantiles): cobertura P10–P90 entre **{min(v['cobertura_p10_p90'] for v in sc.values()):.0%} y {max(v['cobertura_p10_p90'] for v in sc.values()):.0%}** (objetivo 80%)
+
+**Titulación (descriptivo, SIES 2024):** % de mujeres y edad promedio de titulación por carrera/área,
+desde el archivo crudo de titulados del SIES (agregado nacional, no individual). Se asigna por nombre de
+carrera genérica con respaldo por área. Es contexto ("¿cómo es titularse de esto?"), no predicción.
 
 **Matrícula efectiva (descriptivo, no es target):** cruzando admisión ↔ matrícula 2026 por estudiante
 (`ID_aux`), muestra qué % de los **seleccionados** en 1ª preferencia **efectivamente se matriculó** en esa
