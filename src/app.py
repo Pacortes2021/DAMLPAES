@@ -585,33 +585,34 @@ with st.sidebar:
                           index=opt(L["region"]).index("13") if "13" in L["region"] else 0)
     comunas_reg = [c for c in opt(L["comuna"]) if L["comuna_region"].get(c) == region] or opt(L["comuna"])
     comuna = st.selectbox("Comuna", comunas_reg, format_func=lambda k: L["comuna"].get(k, k))
-    dependencia = st.selectbox("Dependencia del colegio", opt(L["dependencia"]), format_func=lambda k: L["dependencia"].get(k, k))
-    rama = st.selectbox("Rama educacional", opt(L["rama"]), format_func=lambda k: L["rama"].get(k, k))
-    # colegio (opcional): afina la estimación con el historial PAES del establecimiento.
-    # Se filtra por comuna Y por la dependencia elegida, para no mezclar (ej.: "Municipal" + un colegio
-    # particular), combinación que el modelo nunca vio y que sería incoherente.
+    # Cascada simple: la comuna acota qué DEPENDENCIAS existen, y la dependencia qué RAMAS existen.
+    # Solo se muestran las opciones que realmente tienen colegios en esa comuna (si la comuna no tiene
+    # colegios en los datos, se muestran todas como respaldo).
     _cols = art.rbd_stats.get("colegios", {})
     try:
         _ccod = int(comuna)
     except (TypeError, ValueError):
         _ccod = None
-    _rg = {"H": "HC", "T": "TP"}.get(str(rama)[:1])   # rama mayor del usuario (HC/TP); colegios polivalentes traen ambas
+    _com_cols = [c for c in _cols.values() if c.get("com_cod") == _ccod]
+    _deps = [d for d in opt(L["dependencia"]) if any(c.get("dep") == d for c in _com_cols)] or opt(L["dependencia"])
+    dependencia = st.selectbox("Dependencia del colegio", _deps, format_func=lambda k: L["dependencia"].get(k, k))
+    _rg_avail = set().union(*[set(c.get("ramas", [])) for c in _com_cols if c.get("dep") == dependencia]) if _com_cols else set()
+    _ramas = [r for r in opt(L["rama"]) if {"H": "HC", "T": "TP"}.get(r[0]) in _rg_avail] or opt(L["rama"])
+    rama = st.selectbox("Rama educacional", _ramas, format_func=lambda k: L["rama"].get(k, k))
+    # colegio (opcional): coherente con comuna + dependencia + rama (nunca queda vacío salvo comuna sin datos)
+    _rg = {"H": "HC", "T": "TP"}.get(str(rama)[:1])
     _ops = sorted([(r, c["nom"]) for r, c in _cols.items()
                    if c.get("com_cod") == _ccod and c.get("dep") == dependencia
                    and (_rg is None or _rg in (c.get("ramas") or []))], key=lambda t: t[1])
     _nm = {r: n for r, n in _ops}
-    # key dinámico: al cambiar región/comuna/dependencia/rama el selector se RESETEA (evita arrastrar un
-    # colegio de otro contexto, bug de estado de Streamlit que metía un RBD incoherente).
     rbd_sel = st.selectbox("🏫 Tu colegio (opcional)", [None] + [r for r, _ in _ops],
                            format_func=lambda r: "— No especificar —" if r is None else _nm.get(r, r),
                            key=f"colegio_{region}_{comuna}_{dependencia}_{rama}",
-                           help="Lista filtrada por tu comuna, dependencia y rama. Afina la estimación PRE-PAES con el historial de tu colegio. Opcional.")
+                           help="Afina la estimación PRE-PAES con el historial PAES de tu colegio. Opcional.")
     if rbd_sel is not None and rbd_sel not in _nm:   # red de seguridad: solo un RBD del filtro actual
         rbd_sel = None
-    if not _ops:
-        _drama = ("técnico-profesional" if _rg == "TP" else "humanista-científicos") if _rg else ""
-        st.caption(f"Sin colegios **{L['dependencia'].get(dependencia, '')}** {_drama} con historial en esta comuna. "
-                   "Ajusta dependencia o rama si no ves el tuyo; si no, se usa el promedio comunal.")
+    if not _com_cols:
+        st.caption("Esta comuna no tiene colegios con historial PAES en los datos; se usará el promedio comunal.")
     st.markdown("**3 · Tus puntajes PAES** · *si ya rendiste*")
     s_clec = st.number_input("C. Lectora", 0, 1000, 0, 5, key="s_clec", help="Déjalo en 0 si aún no rindes")
     s_mate1 = st.number_input("Matemática M1", 0, 1000, 0, 5, key="s_mate1")
