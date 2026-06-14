@@ -39,6 +39,7 @@ class Artifacts:
     cortes_hist: dict                 # corte por carrera por año 2024-2026 (tendencia, contexto)
     oferta: dict                      # detalle institucional por carrera (nivel, jornada, duración, sede, origen) SIES
     seleccion: dict                   # distribución del ponderado de los seleccionados por carrera (cohorte reciente)
+    rbd_stats: dict                   # media histórica PAES por colegio (RBD) + respaldo comuna/global
 
 
 def _load_json_opt(path, default):
@@ -67,6 +68,7 @@ def load_artifacts() -> Artifacts:
         cortes_hist=_load_json_opt(_P("data/processed/cortes_historicos.json"), {}),
         oferta=_load_json_opt(_P("data/processed/oferta_detalle.json"), {}),
         seleccion=_load_json_opt(_P("data/processed/seleccion_stats.json"), {}),
+        rbd_stats=_load_json_opt(_P("data/processed/rbd_stats.json"), {"colegios": {}, "comuna": {}, "global": {}}),
     )
 
 
@@ -106,6 +108,7 @@ class Perfil:
     comuna: str = ""
     dependencia: str = ""
     rama: str = ""
+    rbd: str | int | None = None     # colegio (RBD) — opcional; afina la estimación de puntaje
     # Post-PAES (opcionales)
     clec: float | None = None
     mate1: float | None = None
@@ -220,13 +223,26 @@ def predecir(art: Artifacts, perfil: Perfil) -> dict:
     return out
 
 
+def rbd_hist(rbd_stats: dict, rbd, comuna, prueba: str):
+    """Media histórica PAES del colegio para la prueba; respaldo: media de comuna → global.
+    Igual que en el entrenamiento (scripts/11_retrain_score_rbd.py)."""
+    if rbd is not None:
+        c = rbd_stats.get("colegios", {}).get(str(rbd))
+        if c and prueba in c.get("m", {}):
+            return c["m"][prueba]
+    cm = rbd_stats.get("comuna", {}).get(str(comuna))
+    if cm and prueba in cm:
+        return cm[prueba]
+    g = rbd_stats.get("global", {}).get(prueba)
+    return g if g is not None else np.nan
+
+
 def predecir_puntaje(art: Artifacts, perfil: Perfil) -> dict:
-    """Puntaje PAES probable POR PRUEBA (CLEC, MATE1), cada uno con banda P10/P50/P90.
+    """Puntaje PAES probable POR PRUEBA, cada uno con banda P10/P50/P90.
 
     Devuelve {"CLEC": {"p10","p50","p90"}, "MATE1": {...}, "nivel": {...}}.
-    No es una fórmula: cada valor sale de un modelo de regresión por cuantiles
-    entrenado con origen + notas.
-    """
+    No es una fórmula: cada valor sale de un modelo de regresión por cuantiles entrenado con
+    origen + notas (+ historial del colegio, RBD_HIST, si el meta lo incluye y se conoce el RBD)."""
     completar_equivalencias(perfil, art.conv)
     meta = art.meta_score
     num, cat, maps = meta["features_num"], meta["features_cat"], meta["cat_mappings"]
@@ -234,17 +250,21 @@ def predecir_puntaje(art: Artifacts, perfil: Perfil) -> dict:
            "PROMEDIO_NOTAS": perfil.promedio_notas, "PORC_SUP_NOTAS": perfil.porc_sup,
            "GRUPO_DEPENDENCIA": perfil.dependencia, "CODIGO_REGION": perfil.region,
            "CODIGO_COMUNA": perfil.comuna, "RAMA_EDUCACIONAL": perfil.rama}
-    fila = {}
+    base = {}
     for c in num:
-        fila[c] = pd.to_numeric(pd.Series([val.get(c)]), errors="coerce").iloc[0]
+        base[c] = np.nan if c == "RBD_HIST" else pd.to_numeric(pd.Series([val.get(c)]), errors="coerce").iloc[0]
     for c in cat:
-        fila[c] = maps[c].get(str(val.get(c)), maps[c].get("__OTRAS__"))
-    X = pd.DataFrame([fila])[num + cat]
-    for c in cat:
-        X[c] = X[c].astype("int32")
+        base[c] = maps[c].get(str(val.get(c)), maps[c].get("__OTRAS__"))
 
     out = {}
+    usa_rbd = "RBD_HIST" in num
     for prueba, qmodels in art.score_models.items():
+        fila = dict(base)
+        if usa_rbd:                                   # historial del colegio para ESTA prueba
+            fila["RBD_HIST"] = rbd_hist(art.rbd_stats, perfil.rbd, perfil.comuna, prueba)
+        X = pd.DataFrame([fila])[num + cat]
+        for c in cat:
+            X[c] = X[c].astype("int32")
         q = {k: float(m.predict(X)[0]) for k, m in qmodels.items()}
         p10, p90 = min(q.values()), max(q.values())
         out[prueba] = {"p10": p10, "p50": min(max(q["q50"], p10), p90), "p90": p90}

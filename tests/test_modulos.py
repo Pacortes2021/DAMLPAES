@@ -118,6 +118,29 @@ def test_seleccion_stats_valido():
         assert v["anio"] >= 2024 and v["n"] >= 15
 
 
+def test_rbd_stats_valido():
+    f = _P("data/processed/rbd_stats.json")
+    if not os.path.exists(f):
+        return
+    d = json.load(open(f))
+    assert {"colegios", "comuna", "global"} <= set(d)
+    assert len(d["colegios"]) > 1000
+    for v in list(d["colegios"].values())[:60]:
+        assert v["n"] >= 10 and v["nom"]                 # tiene historial y nombre
+        for p, m in v["m"].items():                      # medias PAES en escala válida
+            assert 100 <= m <= 1000
+    assert all(100 <= x <= 1000 for x in d["global"].values())
+
+
+def test_score_model_usa_rbd():
+    f = _P("models/modelo_puntaje_meta.json")
+    if not os.path.exists(f):
+        return
+    m = json.load(open(f))
+    if m.get("usa_rbd"):                                  # si se reentrenó con colegio, debe estar la feature
+        assert "RBD_HIST" in m["features_num"]
+
+
 def test_oferta_detalle_valido():
     f = _P("data/processed/oferta_detalle.json")
     if not os.path.exists(f):

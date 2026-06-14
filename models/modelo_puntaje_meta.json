@@ -1,11 +1,12 @@
 {
-  "modelo": "Puntaje PAES por prueba (CLEC, MATE1) — regresión por cuantiles",
+  "modelo": "Puntaje PAES por prueba — regresión por cuantiles + feature de colegio (RBD_HIST)",
   "validacion": "temporal: entrena 2025 → evalúa 2026",
   "features_num": [
     "PTJE_NEM",
     "PTJE_RANKING",
     "PROMEDIO_NOTAS",
-    "PORC_SUP_NOTAS"
+    "PORC_SUP_NOTAS",
+    "RBD_HIST"
   ],
   "features_cat": [
     "GRUPO_DEPENDENCIA",
@@ -312,6 +313,7 @@
       "__OTRAS__": 10
     }
   },
+  "usa_rbd": true,
   "pruebas": [
     "CLEC",
     "MATE1",
@@ -326,29 +328,29 @@
   },
   "metrics": {
     "CLEC": {
-      "cobertura_p10_p90": 0.7770420806147271,
-      "mae_p50": 74.10129796824872,
-      "ancho_banda": 228.57615746646908
+      "cobertura_p10_p90": 0.7800657012299088,
+      "mae_p50": 71.26624170429726,
+      "ancho_banda": 219.86338898804647
     },
     "MATE1": {
-      "cobertura_p10_p90": 0.80076698112134,
-      "mae_p50": 88.23547773978636,
-      "ancho_banda": 284.75622294336097
+      "cobertura_p10_p90": 0.8020358000386905,
+      "mae_p50": 82.2010817967182,
+      "ancho_banda": 264.97035468388697
     },
     "MATE2": {
-      "cobertura_p10_p90": 0.84612025876432,
-      "mae_p50": 57.173310891344336,
-      "ancho_banda": 208.02035747000923
+      "cobertura_p10_p90": 0.8403290857070632,
+      "mae_p50": 54.30647782516139,
+      "ancho_banda": 193.8270032478034
     },
     "HCSOC": {
-      "cobertura_p10_p90": 0.8207489836120542,
-      "mae_p50": 88.54798978460202,
-      "ancho_banda": 295.9757299208147
+      "cobertura_p10_p90": 0.8189572069240119,
+      "mae_p50": 84.56999743170032,
+      "ancho_banda": 282.0467962007292
     },
     "CIEN": {
-      "cobertura_p10_p90": 0.7515623278869102,
-      "mae_p50": 71.15177710432387,
-      "ancho_banda": 216.33409091162557
+      "cobertura_p10_p90": 0.7558068661648614,
+      "mae_p50": 65.99336809744749,
+      "ancho_banda": 201.83521937488888
     }
   }
 }

@@ -587,6 +587,19 @@ with st.sidebar:
     comuna = st.selectbox("Comuna", comunas_reg, format_func=lambda k: L["comuna"].get(k, k))
     dependencia = st.selectbox("Dependencia del colegio", opt(L["dependencia"]), format_func=lambda k: L["dependencia"].get(k, k))
     rama = st.selectbox("Rama educacional", opt(L["rama"]), format_func=lambda k: L["rama"].get(k, k))
+    # colegio (opcional): afina la estimación de puntaje con el historial PAES del establecimiento
+    _cols = art.rbd_stats.get("colegios", {})
+    try:
+        _ccod = int(comuna)
+    except (TypeError, ValueError):
+        _ccod = None
+    _ops = sorted([(r, c["nom"]) for r, c in _cols.items() if c.get("com_cod") == _ccod], key=lambda t: t[1])
+    _nm = {r: n for r, n in _ops}
+    rbd_sel = st.selectbox("🏫 Tu colegio (opcional)", [None] + [r for r, _ in _ops],
+                           format_func=lambda r: "— No especificar —" if r is None else _nm.get(r, r),
+                           help="Afina la estimación de puntaje PRE-PAES con el historial de tu colegio. Opcional.")
+    if not _ops:
+        st.caption("Sin colegios con historial PAES en esta comuna; se usará el promedio comunal.")
     st.markdown("**3 · Tus puntajes PAES** · *si ya rendiste*")
     s_clec = st.number_input("C. Lectora", 0, 1000, 0, 5, key="s_clec", help="Déjalo en 0 si aún no rindes")
     s_mate1 = st.number_input("Matemática M1", 0, 1000, 0, 5, key="s_mate1")
@@ -598,7 +611,7 @@ row = subset[subset["univ_display"] == uni_sel].iloc[0]
 cod = int(row["CODIGO_CARRERA"])
 st_info = art.stats.get(str(cod))
 perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=promedio, porc_sup=porc_sup,
-                     region=region, comuna=comuna, dependencia=dependencia, rama=rama)
+                     region=region, comuna=comuna, dependencia=dependencia, rama=rama, rbd=rbd_sel)
 es_post = s_clec >= 100 and s_mate1 >= 100
 perfil_post = replace(perfil_base, clec=s_clec if s_clec >= 100 else None, mate1=s_mate1 if s_mate1 >= 100 else None,
                       mate2=s_mate2 if s_mate2 >= 100 else None, hcsoc=s_hcsoc if s_hcsoc >= 100 else None,
@@ -641,7 +654,8 @@ def render_resultado():
     else:                                                  # PRE: estimación desde notas + contexto
         _p, _pond = _vres["p_pre"], _esc("p50")[0]
         _gtit = "Probabilidad de acceso (estimada)"
-        st.caption("🔮 **Estimación antes de la PAES**, a partir de tus notas y contexto. "
+        _coltxt = " (afinada con el historial de tu colegio 🏫)" if perfil_base.rbd else ""
+        st.caption(f"🔮 **Estimación antes de la PAES**, a partir de tus notas y contexto{_coltxt}. "
                    "Ingresa tus puntajes PAES en la barra lateral ⬅️ para ver el resultado real.")
     _gap = (_corte - _pond) if (_corte and _pond is not None) else None
 
