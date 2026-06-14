@@ -34,13 +34,15 @@ def _num(s):
 
 
 def cargar_archivoc(anio, path):
-    cols = ["RBD", "CODIGO_COMUNA", "CODIGO_REGION", "GRUPO_DEPENDENCIA"] + [f"{p}_REG_ACTUAL" for p in PRUEBAS]
+    cols = (["RBD", "CODIGO_COMUNA", "CODIGO_REGION", "GRUPO_DEPENDENCIA", "RAMA_EDUCACIONAL"]
+            + [f"{p}_REG_ACTUAL" for p in PRUEBAS])
     df = pd.read_csv(path, sep=";", encoding="latin-1", usecols=lambda c: c in cols, low_memory=False)
     df = df.rename(columns={f"{p}_REG_ACTUAL": p for p in PRUEBAS})
     for p in PRUEBAS:
         df[p] = _num(df[p]).where(lambda x: x.between(100, 1000))
     df["RBD"] = _num(df["RBD"])
     df["DEP"] = _num(df["GRUPO_DEPENDENCIA"])    # 1=Part.pagado 2=Part.subv 3=Municipal 4=SLE (código DEMRE)
+    df["RG"] = df["RAMA_EDUCACIONAL"].astype(str).str.strip().str[0].map({"H": "HC", "T": "TP"})  # rama mayor
     return df
 
 
@@ -62,9 +64,12 @@ rbd_n = g.size()
 # dependencia REAL del colegio (modal de sus alumnos) → para filtrar el selector de forma coherente
 dep_modal = (ac.dropna(subset=["RBD", "DEP"]).groupby("RBD")["DEP"]
              .agg(lambda s: int(s.mode().iloc[0])))
+# ramas mayores (HC/TP) que el colegio realmente ofrece (≥3 alumnos) — un colegio puede ser polivalente
+ramas_set = (ac.dropna(subset=["RBD", "RG"]).groupby("RBD")["RG"]
+             .apply(lambda s: sorted({g for g, c in s.value_counts().items() if c >= 3})))
 
-# directorio MINEDUC → nombre del colegio
-dire = pd.read_csv(DIR, sep=";", encoding="latin-1",
+# directorio MINEDUC → nombre del colegio (este archivo viene en UTF-8, a diferencia del ArchivoC)
+dire = pd.read_csv(DIR, sep=";", encoding="utf-8",
                    usecols=["RBD", "NOM_RBD", "COD_COM_RBD", "NOM_COM_RBD", "COD_REG_RBD"], low_memory=False)
 dire = dire.drop_duplicates("RBD").set_index("RBD")
 
@@ -83,7 +88,8 @@ for rbd, fila in rbd_m.iterrows():
     reg_cod = int(info["COD_REG_RBD"]) if info is not None and info["COD_REG_RBD"] == info["COD_REG_RBD"] else None
     dep = dep_modal.get(rbd)
     colegios[str(int(rbd))] = {"nom": nom, "comuna": com, "com_cod": com_cod, "reg_cod": reg_cod,
-                               "dep": str(dep) if dep is not None else None, "n": n, "m": medias}
+                               "dep": str(dep) if dep is not None else None,
+                               "ramas": ramas_set.get(rbd, []), "n": n, "m": medias}
 
 out = {"pruebas": PRUEBAS, "anios": list(ARCHIVOC), "colegios": colegios, "comuna": com_m, "global": glob_m}
 json.dump(out, open(os.path.join(ROOT, "data/processed/rbd_stats.json"), "w"), ensure_ascii=False)
