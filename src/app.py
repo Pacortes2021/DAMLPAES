@@ -434,38 +434,47 @@ st.markdown("""
 Modelos validados temporalmente (entrena 2025 → testea 2026) · DAML 2026 · Grupo 5</p></div>
 """, unsafe_allow_html=True)
 
-# ----------------------------------------------------------------- 1 · CARRERA (página principal)
-@st.dialog("📖 Cómo usar este dashboard", width="large")
-def mostrar_tutorial():
-    pasos = [
-        ("1 · Elige tu carrera", "En la **barra lateral** (izquierda ⬅️) elige la **carrera** y la **universidad** "
-         "que te interesan. Escribe para buscar; los nombres están en MAYÚSCULAS."),
-        ("2 · Completa tu perfil", "Más abajo en la barra lateral, ingresa tus **notas** (NEM y ranking) y de **dónde "
-         "vienes** (región, comuna, colegio). Si ya rendiste la PAES, agrega tus **puntajes**."),
-        ("3 · Mira tu resultado", "En **🎯 Mi resultado** verás tu **probabilidad de acceso**, tu **ponderado vs el "
-         "corte** y **cuánto te falta**. Puedes descargar el resumen."),
-        ("4 · Explora", "Arriba cambias de modo: **📋 La carrera** (ponderaciones, titulación, cortes), "
-         "**🔎 ¿Dónde quedo?** (dónde tienes chance), **⚖️ Comparar** y **🗺️ Mapa**."),
-    ]
+# ----------------------------------------------------------------- tutorial (panel inline, NO modal)
+# Se usaba @st.dialog, pero Streamlit re-invoca el diálogo por su cuenta en cada rerun y no expone un
+# callback de "cerrado": eso lo hacía reaparecer solo con cualquier clic. Un panel inline gobernado por
+# un booleano (show_tut) es 100% predecible: se muestra/oculta sin ciclo de modal.
+TUT_PASOS = [
+    ("1 · Elige tu carrera", "En la **barra lateral** (izquierda ⬅️) elige la **carrera** y la **universidad** "
+     "que te interesan. Escribe para buscar; los nombres están en MAYÚSCULAS."),
+    ("2 · Completa tu perfil", "Más abajo en la barra lateral, ingresa tus **notas** (NEM y ranking) y de **dónde "
+     "vienes** (región, comuna, colegio). Si ya rendiste la PAES, agrega tus **puntajes**."),
+    ("3 · Mira tu resultado", "En **🎯 Mi resultado** verás tu **probabilidad de acceso**, tu **ponderado vs el "
+     "corte** y **cuánto te falta**. Puedes descargar el resumen."),
+    ("4 · Explora", "Arriba cambias de modo: **📋 La carrera** (ponderaciones, titulación, cortes), "
+     "**🔎 ¿Dónde quedo?** (dónde tienes chance), **⚖️ Comparar** y **🗺️ Mapa**."),
+]
+
+
+def render_tutorial():
     paso = st.session_state.get("tut_paso", 0)
-    titulo, texto = pasos[paso]
-    st.markdown(f"### {titulo}")
-    st.markdown(texto)
-    st.progress((paso + 1) / len(pasos))
-    b1, _, b3 = st.columns([1, 2, 1])
-    if paso > 0 and b1.button("← Atrás", use_container_width=True):
-        st.session_state["tut_paso"] = paso - 1; st.session_state["_abrir_tutorial"] = True; st.rerun()
-    if paso < len(pasos) - 1:
-        if b3.button("Siguiente →", use_container_width=True, type="primary"):
-            st.session_state["tut_paso"] = paso + 1; st.session_state["_abrir_tutorial"] = True; st.rerun()
-    elif b3.button("¡Listo! 🎉", use_container_width=True, type="primary"):
-        st.session_state["tut_paso"] = 0; st.rerun()   # no re-arma el flag → queda cerrado
+    titulo, texto = TUT_PASOS[paso]
+    with st.container(border=True):
+        hc1, hc2 = st.columns([8, 1])
+        hc1.markdown(f"#### 📖 Cómo usar este dashboard")
+        if hc2.button("✕", key="tut_x", help="Cerrar tutorial"):
+            st.session_state["show_tut"] = False; st.rerun()
+        st.markdown(f"**{titulo}**")
+        st.markdown(texto)
+        st.progress((paso + 1) / len(TUT_PASOS))
+        b1, _, b3 = st.columns([1, 3, 1])
+        if paso > 0 and b1.button("← Atrás", key="tut_prev", use_container_width=True):
+            st.session_state["tut_paso"] = paso - 1; st.rerun()
+        if paso < len(TUT_PASOS) - 1:
+            if b3.button("Siguiente →", key="tut_next", use_container_width=True, type="primary"):
+                st.session_state["tut_paso"] = paso + 1; st.rerun()
+        elif b3.button("¡Listo! 🎉", key="tut_done", use_container_width=True, type="primary"):
+            st.session_state["show_tut"] = False; st.session_state["tut_paso"] = 0; st.rerun()
 
 
 if "tut_seen" not in st.session_state:           # se abre automáticamente solo la 1ª vez de la sesión
     st.session_state["tut_seen"] = True
     st.session_state["tut_paso"] = 0
-    st.session_state["_abrir_tutorial"] = True
+    st.session_state["show_tut"] = True
 
 cat = art.catalogo.copy()
 cat["reg_nom"] = cat["REGION_CASA_MATRIZ"].astype("Int64").astype(str).map(L["region"]).fillna("")
@@ -484,7 +493,7 @@ cat_idx = cat.set_index("CODIGO_CARRERA")
 with st.sidebar:
     st.markdown(f"<div style='font-weight:800;color:{AZUL_OSC};font-size:1.1rem'>🎓 Tus datos</div>", unsafe_allow_html=True)
     if st.button("📖 Tutorial · cómo usar", use_container_width=True):
-        st.session_state["tut_paso"] = 0; st.session_state["_abrir_tutorial"] = True; st.rerun()
+        st.session_state["tut_paso"] = 0; st.session_state["show_tut"] = True; st.rerun()
     st.markdown("**1 · Tu carrera**")
     carreras = sorted(cat["CARRERA_U"].unique())
     idx0 = carreras.index("ARQUITECTURA") if "ARQUITECTURA" in carreras else 0
@@ -531,8 +540,8 @@ v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
 vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
 vac_total = v1 + v2 + vac_esp
 
-if st.session_state.pop("_abrir_tutorial", False):   # flag transitorio: se consume al abrir → no reabre solo
-    mostrar_tutorial()
+if st.session_state.get("show_tut"):                 # panel inline, sobre las pestañas (sin modal)
+    render_tutorial()
 
 # ----------------------------------------------------------------- modo: MI RESULTADO
 def render_resultado():
