@@ -405,7 +405,7 @@ def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
         fila["Universidad"] = ("🆕 " if nueva else "") + str(c["NOMBRE_UNIVERSIDAD"]).title()
         fila["Región"] = str(c["reg_nom"])
         fila["P(acceso)"] = d["p"] * 100
-        fila["Corte 2025"] = d["corte"]
+        fila["Corte"] = d["corte"]
         if incluir_margen:
             fila["Tu margen"] = d["margen"]
         data.append(fila)
@@ -416,9 +416,9 @@ def mostrar_tabla(df: pd.DataFrame):
     st.dataframe(df, hide_index=True, width="stretch", column_config={
         "P(acceso)": st.column_config.ProgressColumn("Prob. acceso", min_value=0, max_value=100,
                                                      format="%.0f%%", help="Probabilidad calibrada (POST-PAES)"),
-        "Corte 2025": st.column_config.NumberColumn("Corte 2025", format="%.0f"),
+        "Corte": st.column_config.NumberColumn("Corte", format="%.0f", help="Corte regular más reciente (mín. ponderado de los seleccionados)"),
         "Tu margen": st.column_config.NumberColumn("Tu margen", format="%+.0f",
-                                                   help="Tu ponderado menos el corte del año previo"),
+                                                   help="Tu ponderado menos el corte más reciente"),
     })
 
 
@@ -630,6 +630,7 @@ def render_resultado():
         return
     st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
     _corte = _vres["corte"]
+    _canio = (st_info or {}).get("anio", 2026)             # año del corte de referencia (último cerrado)
     _es_real = es_post                                     # ¿hay puntajes PAES reales? → un solo modelo/gráfico
 
     if _es_real:                                           # POST: puntajes PAES reales
@@ -650,7 +651,7 @@ def render_resultado():
         st.markdown("<br>", unsafe_allow_html=True)
         _vm = st.columns(3)
         _vm[0].metric("Tu ponderado" if _es_real else "🎯 Ponderado estimado", f"{_pond:.0f}" if _pond is not None else "s/d")
-        _vm[1].metric("Corte 2025", f"{_corte:.0f}" if _corte else "s/d")
+        _vm[1].metric(f"Corte {_canio}", f"{_corte:.0f}" if _corte else "s/d")
         if _gap is not None:
             _vm[2].metric("Tu margen" if _es_real else "Margen estimado", f"{-_gap:+.0f}", delta=f"{-_gap:+.0f}")
         if _gap is not None and _gap > 0:
@@ -697,7 +698,7 @@ def render_resultado():
                (f"Tu ponderado: {_pond:.0f}" if _es_real else f"Ponderado estimado: ~{_pond:.0f}")
                if _pond is not None else "Ponderado: s/d"]
     if _corte and _pond is not None:
-        _lineas.append(f"Corte 2025: {_corte:.0f}  ·  margen: {(_pond-_corte):+.0f}")
+        _lineas.append(f"Corte {_canio}: {_corte:.0f}  ·  margen: {(_pond-_corte):+.0f}")
     if _sel:
         _lineas.append(f"Seleccionados {_sel['anio']}: entraron entre {_sel['p05']:.0f} y {_sel['p95']:.0f} "
                        f"(mediana {_sel['p50']:.0f})")
@@ -731,11 +732,12 @@ with tab_car:
         st.markdown(ficha_oferta_html(of), unsafe_allow_html=True)
     cL, cR = st.columns([1, 1])
     with cL:
+        _canio = (st_info or {}).get("anio", 2026)         # año del corte/ingreso de referencia
         corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
         cupos_txt = f"{st_info['cupos']}" if st_info else "s/d"
         vac_txt = f"{int(vac_total)}" if vac_total > 0 else "s/d"
-        st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte 2025</div></div>"
-                    f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron 2025</div></div>"
+        st.markdown(f"<div class='stats'><div class='stat'><div class='v'>{corte_txt}</div><div class='l'>Corte {_canio}</div></div>"
+                    f"<div class='stat'><div class='v'>{cupos_txt}</div><div class='l'>Ingresaron {_canio}</div></div>"
                     f"<div class='stat'><div class='v'>{vac_txt}</div><div class='l'>Vacantes 2026</div></div></div>",
                     unsafe_allow_html=True)
         desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
@@ -743,7 +745,7 @@ with tab_car:
         st.caption(f"📍 {row['reg_nom']} · código {cod}"
                    + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
         if st_info is None:
-            st.markdown("<div class='warn'>⚠️ Carrera sin corte histórico 2025 (nueva/sin datos): mayor incertidumbre.</div>",
+            st.markdown("<div class='warn'>⚠️ Carrera sin corte reciente (nueva/sin datos): mayor incertidumbre.</div>",
                         unsafe_allow_html=True)
         mtr = art.matricula.get(str(cod))
         historia = historia_carrera(mtr, v2, vac_total, vac_esp) if mtr else ""
@@ -868,7 +870,8 @@ with tab_comp:
                     st.plotly_chart(gauge(p, "Prob. de acceso"), use_container_width=True, key=f"cg_{codc}")
                 else:
                     st.info("Faltan datos para estimar.")
-                st.metric("Corte 2025", f"{res['corte']:.0f}" if res["corte"] else "s/d")
+                _canio_c = (art.stats.get(str(codc)) or {}).get("anio", 2026)
+                st.metric(f"Corte {_canio_c}", f"{res['corte']:.0f}" if res["corte"] else "s/d")
                 if c_post and res["margen"] is not None and res["margen"] == res["margen"]:
                     st.metric("Tu margen", f"{res['margen']:+.0f}")
                 st.metric("Vacantes 2026", f"{int(vac_total_de(rc))}" if vac_total_de(rc) else "s/d")
