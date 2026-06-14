@@ -188,7 +188,7 @@ def fig_tes(tes: dict, n: int):
         marker_color=[TES_COL[k] for k, _ in items], text=[f"{v:.0f}%" for _, v in items],
         textposition="outside", textfont=dict(color=AZUL_OSC, size=12)))
     fig.update_layout(height=max(170, 40 * len(items) + 60), margin=dict(l=8, r=30, t=40, b=8),
-        title=dict(text=f"🏫 Colegio de origen de los matriculados · n={n:,}".replace(",", "."),
+        title=dict(text=f"🏫 Origen escolar · matrícula total n={n:,}".replace(",", "."),
                    font=dict(size=13, color=AZUL_OSC)),
         xaxis=dict(range=[0, max(v for _, v in items) * 1.18], ticksuffix="%", showgrid=False),
         plot_bgcolor="white", paper_bgcolor="white")
@@ -717,14 +717,19 @@ with tab_car:
             st.markdown("<br>", unsafe_allow_html=True)
             t = of["tes"]
             muni_sub = t.get("municipal", 0) + t.get("part_subv", 0) + t.get("sle", 0) + t.get("corp_ad", 0)
-            st.markdown(f"<div class='nota'>De los matriculados de <b>{str(row['UNIV_U']).title()}</b> en esta carrera "
+            _nt, _np = of.get("n_total"), of.get("n_primer")
+            _mt = (f"<b>{_nt:,}</b> matriculados (todos los años de la carrera)".replace(",", ".")
+                   + (f" · <b>{_np:,}</b> ingreso de 1er año".replace(",", ".") if _np else "")) if _nt else ""
+            st.markdown(f"<div class='nota'>De la matrícula de <b>{str(row['UNIV_U']).title()}</b> en esta carrera "
                         f"(SIES {of.get('anio')}), <b>{muni_sub:.0f}%</b> viene de colegios <b>públicos o "
-                        f"subvencionados</b> y <b>{t.get('part_pagado', 0):.0f}%</b> de <b>particulares pagados</b>.</div>",
+                        f"subvencionados</b> y <b>{t.get('part_pagado', 0):.0f}%</b> de <b>particulares pagados</b>."
+                        + (f"<br><span style='font-size:.85em;color:#475569'>{_mt}</span>" if _mt else "") + "</div>",
                         unsafe_allow_html=True)
             st.markdown("<div class='warn'>💲 <b>Arancel:</b> no disponible en los datos DEMRE/SIES de este proyecto.</div>",
                         unsafe_allow_html=True)
-        st.caption("Composición por **tipo de establecimiento de origen** de quienes se matricularon (SIES, agregado de la carrera). "
-                   "Es contexto socioeconómico, no predicción.")
+        st.caption("El desglose por **establecimiento de origen** es sobre la **matrícula total** de la carrera (todas las "
+                   "cohortes que siguen estudiando), no solo la cohorte que entró el último año: el SIES no publica este "
+                   "desglose separado para el ingreso de 1er año. Es contexto socioeconómico, no predicción.")
     _tnorm = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tt = art.titulacion.get("por_carrera", {}).get(_tnorm) if _tnorm else None
     _tlabel = "Todas las universidades"

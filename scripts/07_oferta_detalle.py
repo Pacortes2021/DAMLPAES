@@ -106,7 +106,8 @@ def main():
             continue
         cand = cand[cand["_sc"] == cand["_sc"].max()]
         # fila principal = plan vigente (más matrícula de 1er año; desempata por TOTAL TES)
-        cand = cand.assign(_tt=pd.to_numeric(cand["TOTAL TES"], errors="coerce").fillna(0.0))
+        cand = cand.assign(_tt=pd.to_numeric(cand["TOTAL TES"], errors="coerce").fillna(0.0),
+                           _tot=pd.to_numeric(cand["TOTAL MATRÍCULA"], errors="coerce").fillna(0.0))
         prin = cand.sort_values(["_primer", "_tt"], ascending=False).iloc[0]
         # TES agregado sobre todas las filas calzadas (composición por colegio de origen)
         tes = {k: sum(_f(v) for v in cand[col]) for k, col in TES_COLS}
@@ -125,7 +126,9 @@ def main():
             "comuna": str(prin["COMUNA"]).title() if prin["COMUNA"] == prin["COMUNA"] else None,
             "sede": str(prin["NOMBRE SEDE"]).title() if prin["NOMBRE SEDE"] == prin["NOMBRE SEDE"] else None,
             "tes": {k: round(100 * v / tes_total, 1) for k, v in tes.items()} if tes_total > 0 else None,
-            "tes_n": int(tes_total),
+            "tes_n": int(tes_total),                       # n del desglose TES ≈ matrícula total (todos los años)
+            "n_total": int(cand["_tot"].sum()),            # matrícula total (todas las cohortes)
+            "n_primer": int(cand["_primer"].sum()),        # ingreso de 1er año (cohorte nueva del último año)
             "match": int(prin["_sc"]),
         }
         out[str(cod)] = rec
