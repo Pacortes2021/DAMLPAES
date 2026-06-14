@@ -34,12 +34,13 @@ def _num(s):
 
 
 def cargar_archivoc(anio, path):
-    cols = ["RBD", "CODIGO_COMUNA", "CODIGO_REGION"] + [f"{p}_REG_ACTUAL" for p in PRUEBAS]
+    cols = ["RBD", "CODIGO_COMUNA", "CODIGO_REGION", "GRUPO_DEPENDENCIA"] + [f"{p}_REG_ACTUAL" for p in PRUEBAS]
     df = pd.read_csv(path, sep=";", encoding="latin-1", usecols=lambda c: c in cols, low_memory=False)
     df = df.rename(columns={f"{p}_REG_ACTUAL": p for p in PRUEBAS})
     for p in PRUEBAS:
         df[p] = _num(df[p]).where(lambda x: x.between(100, 1000))
     df["RBD"] = _num(df["RBD"])
+    df["DEP"] = _num(df["GRUPO_DEPENDENCIA"])    # 1=Part.pagado 2=Part.subv 3=Municipal 4=SLE (código DEMRE)
     return df
 
 
@@ -58,6 +59,9 @@ com_m = {int(c): {p: round(float(v), 1) for p, v in row.items() if v == v}
 g = ac.dropna(subset=["RBD"]).groupby("RBD")
 rbd_m = g[PRUEBAS].mean()
 rbd_n = g.size()
+# dependencia REAL del colegio (modal de sus alumnos) → para filtrar el selector de forma coherente
+dep_modal = (ac.dropna(subset=["RBD", "DEP"]).groupby("RBD")["DEP"]
+             .agg(lambda s: int(s.mode().iloc[0])))
 
 # directorio MINEDUC → nombre del colegio
 dire = pd.read_csv(DIR, sep=";", encoding="latin-1",
@@ -77,8 +81,9 @@ for rbd, fila in rbd_m.iterrows():
     com = str(info["NOM_COM_RBD"]).title() if info is not None else ""
     com_cod = int(info["COD_COM_RBD"]) if info is not None and info["COD_COM_RBD"] == info["COD_COM_RBD"] else None
     reg_cod = int(info["COD_REG_RBD"]) if info is not None and info["COD_REG_RBD"] == info["COD_REG_RBD"] else None
+    dep = dep_modal.get(rbd)
     colegios[str(int(rbd))] = {"nom": nom, "comuna": com, "com_cod": com_cod, "reg_cod": reg_cod,
-                               "n": n, "m": medias}
+                               "dep": str(dep) if dep is not None else None, "n": n, "m": medias}
 
 out = {"pruebas": PRUEBAS, "anios": list(ARCHIVOC), "colegios": colegios, "comuna": com_m, "global": glob_m}
 json.dump(out, open(os.path.join(ROOT, "data/processed/rbd_stats.json"), "w"), ensure_ascii=False)

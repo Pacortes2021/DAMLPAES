@@ -587,19 +587,23 @@ with st.sidebar:
     comuna = st.selectbox("Comuna", comunas_reg, format_func=lambda k: L["comuna"].get(k, k))
     dependencia = st.selectbox("Dependencia del colegio", opt(L["dependencia"]), format_func=lambda k: L["dependencia"].get(k, k))
     rama = st.selectbox("Rama educacional", opt(L["rama"]), format_func=lambda k: L["rama"].get(k, k))
-    # colegio (opcional): afina la estimación de puntaje con el historial PAES del establecimiento
+    # colegio (opcional): afina la estimación con el historial PAES del establecimiento.
+    # Se filtra por comuna Y por la dependencia elegida, para no mezclar (ej.: "Municipal" + un colegio
+    # particular), combinación que el modelo nunca vio y que sería incoherente.
     _cols = art.rbd_stats.get("colegios", {})
     try:
         _ccod = int(comuna)
     except (TypeError, ValueError):
         _ccod = None
-    _ops = sorted([(r, c["nom"]) for r, c in _cols.items() if c.get("com_cod") == _ccod], key=lambda t: t[1])
+    _ops = sorted([(r, c["nom"]) for r, c in _cols.items()
+                   if c.get("com_cod") == _ccod and c.get("dep") == dependencia], key=lambda t: t[1])
     _nm = {r: n for r, n in _ops}
     rbd_sel = st.selectbox("🏫 Tu colegio (opcional)", [None] + [r for r, _ in _ops],
                            format_func=lambda r: "— No especificar —" if r is None else _nm.get(r, r),
-                           help="Afina la estimación de puntaje PRE-PAES con el historial de tu colegio. Opcional.")
+                           help="Lista filtrada por tu comuna y dependencia. Afina la estimación PRE-PAES con el historial de tu colegio. Opcional.")
     if not _ops:
-        st.caption("Sin colegios con historial PAES en esta comuna; se usará el promedio comunal.")
+        st.caption(f"Sin colegios **{L['dependencia'].get(dependencia, '')}** con historial en esta comuna. "
+                   "Cambia la dependencia si no ves el tuyo; si no, se usa el promedio comunal.")
     st.markdown("**3 · Tus puntajes PAES** · *si ya rendiste*")
     s_clec = st.number_input("C. Lectora", 0, 1000, 0, 5, key="s_clec", help="Déjalo en 0 si aún no rindes")
     s_mate1 = st.number_input("Matemática M1", 0, 1000, 0, 5, key="s_mate1")
