@@ -166,9 +166,9 @@ def fig_seleccion(s: dict, user_pond, corte, anio: int, es_real: bool):
         lowerfence=[s["p05"]], upperfence=[s["p95"]], orientation="h", y=["sel"], name="",
         fillcolor="rgba(37,99,235,.18)", line=dict(color=AZUL, width=2),
         whiskerwidth=.6, showlegend=False, hoverinfo="skip"))
-    if corte:                                              # corte del AÑO ANTERIOR (2025), referencia roja
+    if corte:                                              # corte del MISMO año de la caja (piso de admisión)
         fig.add_vline(x=corte, line=dict(color="#dc2626", width=2, dash="dot"),
-                      annotation_text=f"corte 2025: {corte:.0f}", annotation_position="top left",
+                      annotation_text=f"corte {anio}: {corte:.0f}", annotation_position="top left",
                       annotation_font=dict(color="#dc2626", size=11))
     if user_pond is not None:                              # tú = diamante verde
         fig.add_trace(go.Scatter(x=[user_pond], y=["sel"], mode="markers",
@@ -677,17 +677,16 @@ def render_resultado():
     # distribución del ponderado de los seleccionados (boxplot) + dónde caes tú
     _sel = art.seleccion.get(str(cod))
     if _sel and _pond is not None:
-        st.plotly_chart(fig_seleccion(_sel, _pond, _corte, _sel["anio"], _es_real), use_container_width=True, key="box_sel")
+        _corte_box = (art.cortes_hist.get(str(cod)) or {}).get(str(_sel["anio"]))   # corte del MISMO año de la caja
+        st.plotly_chart(fig_seleccion(_sel, _pond, _corte_box, _sel["anio"], _es_real), use_container_width=True, key="box_sel")
         _pos = ("**por sobre la mediana**" if _pond >= _sel["p50"] else
                 "**dentro del 50% central**" if _pond >= _sel["p25"] else
                 "**bajo el 25% que entró más bajo**")
         st.caption(f"📊 **Cómo leerlo:** la **caja azul** abarca al 50% central de quienes entraron en {_sel['anio']} "
                    f"(del p25 al p75); la **línea** del medio es la **mediana** ({_sel['p50']:.0f} → la mitad entró con menos "
-                   f"y la mitad con más); los **bigotes** llegan del p5 al p95. El **diamante verde eres tú** "
-                   f"({'real' if _es_real else 'estimado'}): caes {_pos}. "
-                   f"⚠️ La línea **roja** es el corte del **año anterior (2025)**; como la caja es la cohorte **{_sel['anio']}**, "
-                   f"es normal que algunos entren apenas bajo esa línea (el corte se mueve cada año y la admisión especial "
-                   f"ingresa más abajo).")
+                   f"y la mitad con más); los **bigotes** llegan del p5 al p95. La línea **roja** es el **corte {_sel['anio']}** "
+                   f"(el mínimo con que entró alguien ese año), por eso coincide con el piso de la caja. El **diamante verde "
+                   f"eres tú** ({'real' if _es_real else 'estimado'}): caes {_pos}.")
 
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
