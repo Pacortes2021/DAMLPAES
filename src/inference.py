@@ -37,6 +37,7 @@ class Artifacts:
     matricula: dict                   # matrícula efectiva por carrera (descriptivo, no es target)
     titulacion: dict                  # titulación por carrera/área (género, edad — descriptivo SIES 2024)
     cortes_hist: dict                 # corte por carrera por año 2024-2026 (tendencia, contexto)
+    oferta: dict                      # detalle institucional por carrera (nivel, jornada, duración, sede, origen) SIES
 
 
 def _load_json_opt(path, default):
@@ -63,6 +64,7 @@ def load_artifacts() -> Artifacts:
         matricula=_load_json_opt(_P("data/processed/matricula_stats.json"), {}),
         titulacion=_load_json_opt(_P("data/processed/titulacion_stats.json"), {"por_carrera": {}, "por_area": {}}),
         cortes_hist=_load_json_opt(_P("data/processed/cortes_historicos.json"), {}),
+        oferta=_load_json_opt(_P("data/processed/oferta_detalle.json"), {}),
     )
 
 

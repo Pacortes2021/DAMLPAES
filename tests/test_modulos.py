@@ -105,6 +105,21 @@ def test_titulacion_stats_valido():
         assert 0 <= ici["pct_muj"] <= 100
 
 
+def test_oferta_detalle_valido():
+    f = _P("data/processed/oferta_detalle.json")
+    if not os.path.exists(f):
+        return
+    d = json.load(open(f))
+    assert len(d) > 1000
+    for v in list(d.values())[:50]:
+        if v.get("dur_sem"):                              # duración en semestres; años = sem/2
+            assert 1 <= v["dur_sem"] <= 16
+            assert abs(v["dur_anios"] - v["dur_sem"] / 2) < 0.06
+        if v.get("tes"):                                  # composición por origen suma ~100%
+            assert abs(sum(v["tes"].values()) - 100) <= 1.5
+            assert all(0 <= x <= 100 for x in v["tes"].values())
+
+
 def test_cortes_historicos_valido():
     f = _P("data/processed/cortes_historicos.json")
     if not os.path.exists(f):

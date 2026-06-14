@@ -174,6 +174,49 @@ def fig_pie_genero(s, titulo):
     return fig
 
 
+TES_LBL = {"municipal": "Municipal", "part_subv": "Part. subvencionado", "part_pagado": "Part. pagado",
+           "corp_ad": "Adm. delegada", "sle": "Servicio local"}
+TES_COL = {"municipal": "#2563eb", "part_subv": "#16a34a", "part_pagado": "#f59e0b",
+           "corp_ad": "#8b5cf6", "sle": "#0ea5e9"}
+
+
+def fig_tes(tes: dict, n: int):
+    """Barra horizontal: % de matriculados de 1er año por tipo de establecimiento de ORIGEN (SIES)."""
+    items = [(k, tes.get(k, 0.0)) for k in TES_LBL if tes.get(k, 0.0) > 0]
+    items.sort(key=lambda t: t[1])
+    fig = go.Figure(go.Bar(x=[v for _, v in items], y=[TES_LBL[k] for k, _ in items], orientation="h",
+        marker_color=[TES_COL[k] for k, _ in items], text=[f"{v:.0f}%" for _, v in items],
+        textposition="outside", textfont=dict(color=AZUL_OSC, size=12)))
+    fig.update_layout(height=max(170, 40 * len(items) + 60), margin=dict(l=8, r=30, t=40, b=8),
+        title=dict(text=f"🏫 Colegio de origen de los matriculados · n={n:,}".replace(",", "."),
+                   font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(range=[0, max(v for _, v in items) * 1.18], ticksuffix="%", showgrid=False),
+        plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
+def ficha_oferta_html(of: dict) -> str:
+    """Chips con la ficha institucional de la carrera (nivel, jornada, duración, sede)."""
+    if not of:
+        return ""
+    g = lambda x: f"{x:g}"
+    chips = []
+    if of.get("nivel"):
+        chips.append(f"<span class='pchip ob'>🎓 {of['nivel']}</span>")
+    if of.get("jornada"):
+        otras = [j for j in of.get("jornadas", []) if j != of["jornada"]]
+        chips.append(f"<span class='pchip'>🕗 {of['jornada']}" + (f" +{len(otras)}" if otras else "") + "</span>")
+    if of.get("dur_sem"):
+        a = of.get("dur_anios")
+        chips.append(f"<span class='pchip'>⏳ {g(of['dur_sem'])} sem" + (f" · {g(a)} años" if a else "") + "</span>")
+    loc = " · ".join(x for x in [of.get("comuna"), of.get("region")] if x)
+    if loc:
+        chips.append(f"<span class='pchip'>📍 {loc}</span>")
+    if of.get("sede"):
+        chips.append(f"<span class='pchip'>🏛️ {of['sede']}</span>")
+    return "<div class='pchips' style='margin-top:8px'>" + "".join(chips) + "</div>"
+
+
 def tit_fila(etiqueta, s) -> dict:
     return {" ": etiqueta, "Titulados": s["n"], "% Mujeres": s["pct_muj"], "% Hombres": s["pct_hom"],
             "Edad prom.": s["edad_prom"], "Edad mediana": s["edad_mediana"]}
@@ -633,6 +676,9 @@ with tab_res:
 
 with tab_car:
     st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
+    of = art.oferta.get(str(cod))                         # ficha institucional SIES (nivel/jornada/duración/sede)
+    if of:
+        st.markdown(ficha_oferta_html(of), unsafe_allow_html=True)
     cL, cR = st.columns([1, 1])
     with cL:
         corte_txt = f"{st_info['corte']:.0f}" if st_info else "s/d"
@@ -663,6 +709,22 @@ with tab_car:
             _ftrend = fig_corte_trend(_ch)
             if _ftrend is not None:
                 st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
+    if of and of.get("tes"):                              # origen escolar de los matriculados (TES, SIES)
+        st.markdown("<div class='sec'><h3>🏫 ¿De qué colegios vienen sus matriculados?</h3></div>", unsafe_allow_html=True)
+        oc1, oc2 = st.columns([1.3, 1])
+        oc1.plotly_chart(fig_tes(of["tes"], of.get("tes_n", 0)), use_container_width=True, key="tes_bar")
+        with oc2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            t = of["tes"]
+            muni_sub = t.get("municipal", 0) + t.get("part_subv", 0) + t.get("sle", 0) + t.get("corp_ad", 0)
+            st.markdown(f"<div class='nota'>De los matriculados de <b>{str(row['UNIV_U']).title()}</b> en esta carrera "
+                        f"(SIES {of.get('anio')}), <b>{muni_sub:.0f}%</b> viene de colegios <b>públicos o "
+                        f"subvencionados</b> y <b>{t.get('part_pagado', 0):.0f}%</b> de <b>particulares pagados</b>.</div>",
+                        unsafe_allow_html=True)
+            st.markdown("<div class='warn'>💲 <b>Arancel:</b> no disponible en los datos DEMRE/SIES de este proyecto.</div>",
+                        unsafe_allow_html=True)
+        st.caption("Composición por **tipo de establecimiento de origen** de quienes se matricularon (SIES, agregado de la carrera). "
+                   "Es contexto socioeconómico, no predicción.")
     _tnorm = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tt = art.titulacion.get("por_carrera", {}).get(_tnorm) if _tnorm else None
     _tlabel = "Todas las universidades"
@@ -805,6 +867,11 @@ with st.expander("ℹ️ Sobre los modelos y los datos"):
 **Validación temporal (entrena 2025 → testea 2026):**
 - Acceso POST-PAES — AUC **{mt['auc_roc']:.3f}** · Acceso PRE-PAES — AUC **{mp['auc_roc']:.3f}**
 - Puntaje probable por prueba (cuantiles): cobertura P10–P90 entre **{min(v['cobertura_p10_p90'] for v in sc.values()):.0%} y {max(v['cobertura_p10_p90'] for v in sc.values()):.0%}** (objetivo 80%)
+
+**Ficha de la carrera (descriptivo, SIES, matrícula):** nivel (técnico/profesional), jornada, duración
+formal, región/comuna de la sede y composición de matriculados por **establecimiento de origen** (municipal,
+particular subvencionado/pagado, etc.). Se cruza la oferta DEMRE con la matrícula SIES por institución +
+carrera + región (los códigos difieren entre sistemas). **El arancel no está** en estos datos. Contexto, no predicción.
 
 **Titulación (descriptivo, SIES 2024):** % de mujeres y edad promedio de titulación por carrera/área,
 desde el archivo crudo de titulados del SIES (agregado nacional, no individual). Se asigna por nombre de
