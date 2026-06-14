@@ -22,6 +22,10 @@ st.markdown(f"""
 <style>
   .main .block-container {{max-width:1200px;padding-top:1rem;}}
   .stApp {{background:#f5f8ff;}}
+  section[data-testid="stSidebar"] {{width:370px!important;}}
+  section[data-testid="stSidebar"] > div {{width:370px!important;}}
+  .sbfull {{font-size:.82rem;color:{AZUL_OSC};background:#eef3ff;border:1px solid #d6e2ff;
+            border-radius:8px;padding:6px 9px;margin:-4px 0 4px 0;line-height:1.25;word-break:break-word;}}
   .hero {{background:linear-gradient(120deg,{AZUL_OSC} 0%,{AZUL} 70%,#3b82f6 100%);
           padding:24px 30px;border-radius:16px;color:white;margin-bottom:16px;box-shadow:0 8px 24px rgba(37,99,235,.25);}}
   .hero h1 {{color:white;font-size:1.8rem;margin:0 0 6px 0;}}
@@ -245,24 +249,40 @@ def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
     return fig
 
 
-def fig_mapa_puntaje(territorio, cent, comuna_sel, L):
-    """Mapa de puntos por comuna coloreado por PUNTAJE PAES promedio (alto contraste territorial)."""
+def fig_mapa_puntaje(territorio, geo, cent, comuna_sel, L):
+    """Mapa de Chile (regiones en gris de fondo) con cada comuna como punto coloreado por PUNTAJE PAES
+    promedio. Resalta tu región (borde naranjo) y marca tu comuna (📍). Así se ve 'el mapa', no puntos
+    flotando: no tenemos polígonos de comuna (solo centroides), por eso la comuna va como punto."""
+    codes = [f["properties"]["codregion"] for f in geo["features"]]
+    fig = go.Figure()
+    # base: silueta de Chile (regiones gris claro) para dar contexto geográfico
+    fig.add_trace(go.Choropleth(geojson=geo, locations=codes, featureidkey="properties.codregion",
+        z=[1] * len(codes), colorscale=[[0, "#e9eef7"], [1, "#e9eef7"]], showscale=False,
+        marker_line_color="white", marker_line_width=.6, hoverinfo="skip"))
+    reg_sel = L.get("comuna_region", {}).get(str(comuna_sel))      # región de tu comuna → resaltar
+    if reg_sel:
+        fig.add_trace(go.Choropleth(geojson=geo, locations=[int(reg_sel)],
+            featureidkey="properties.codregion", z=[0], showscale=False,
+            colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],
+            marker_line_color="#f59e0b", marker_line_width=2.5, hoverinfo="skip"))
+    # comunas como puntos coloreados por puntaje
     lons, lats, vals, txt, sizes = [], [], [], [], []
     for code, c in cent.items():
         s = territorio["comuna"].get(code)
         if s and s.get("puntaje") and s["n"] >= 30:
             lons.append(c["lon"]); lats.append(c["lat"]); vals.append(s["puntaje"])
-            sizes.append(6 + min(10, s["n"] ** 0.5 / 12))
+            sizes.append(7 + min(13, s["n"] ** 0.5 / 10))
             txt.append(f"<b>{L['comuna'].get(code, code)}</b><br>Puntaje PAES: {s['puntaje']:.0f}<br>n={s['n']:,}")
-    fig = go.Figure(go.Scattergeo(lon=lons, lat=lats, mode="markers",
+    fig.add_trace(go.Scattergeo(lon=lons, lat=lats, mode="markers",
         marker=dict(size=sizes, color=vals, colorscale="RdYlGn", cmin=min(vals), cmax=max(vals),
                     showscale=True, colorbar=dict(title="Puntaje", thickness=12, len=.55, x=0, xanchor="left"),
-                    line=dict(width=.3, color="white"), opacity=.85),
+                    line=dict(width=.4, color="#475569"), opacity=.9),
         text=txt, hovertemplate="%{text}<extra></extra>"))
     cc = cent.get(str(comuna_sel))
     if cc:
-        fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers",
-            marker=dict(size=16, color="rgba(0,0,0,0)", line=dict(width=3, color="#1e3a8a")),
+        fig.add_trace(go.Scattergeo(lon=[cc["lon"]], lat=[cc["lat"]], mode="markers+text",
+            marker=dict(size=22, color="rgba(0,0,0,0)", line=dict(width=3, color="#1e3a8a")),
+            text=["📍"], textposition="middle center", textfont=dict(size=15),
             hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
     fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
                     lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
@@ -434,16 +454,18 @@ def mostrar_tutorial():
     st.progress((paso + 1) / len(pasos))
     b1, _, b3 = st.columns([1, 2, 1])
     if paso > 0 and b1.button("← Atrás", use_container_width=True):
-        st.session_state["tut_paso"] = paso - 1; st.rerun()
+        st.session_state["tut_paso"] = paso - 1; st.session_state["_abrir_tutorial"] = True; st.rerun()
     if paso < len(pasos) - 1:
         if b3.button("Siguiente →", use_container_width=True, type="primary"):
-            st.session_state["tut_paso"] = paso + 1; st.rerun()
+            st.session_state["tut_paso"] = paso + 1; st.session_state["_abrir_tutorial"] = True; st.rerun()
     elif b3.button("¡Listo! 🎉", use_container_width=True, type="primary"):
-        st.session_state["tutorial"] = False; st.session_state["tut_paso"] = 0; st.rerun()
+        st.session_state["tut_paso"] = 0; st.rerun()   # no re-arma el flag → queda cerrado
 
 
-if "tutorial" not in st.session_state:           # se muestra automáticamente la primera vez
-    st.session_state["tutorial"] = True
+if "tut_seen" not in st.session_state:           # se abre automáticamente solo la 1ª vez de la sesión
+    st.session_state["tut_seen"] = True
+    st.session_state["tut_paso"] = 0
+    st.session_state["_abrir_tutorial"] = True
 
 cat = art.catalogo.copy()
 cat["reg_nom"] = cat["REGION_CASA_MATRIZ"].astype("Int64").astype(str).map(L["region"]).fillna("")
@@ -462,13 +484,15 @@ cat_idx = cat.set_index("CODIGO_CARRERA")
 with st.sidebar:
     st.markdown(f"<div style='font-weight:800;color:{AZUL_OSC};font-size:1.1rem'>🎓 Tus datos</div>", unsafe_allow_html=True)
     if st.button("📖 Tutorial · cómo usar", use_container_width=True):
-        st.session_state["tutorial"] = True; st.session_state["tut_paso"] = 0; st.rerun()
+        st.session_state["tut_paso"] = 0; st.session_state["_abrir_tutorial"] = True; st.rerun()
     st.markdown("**1 · Tu carrera**")
     carreras = sorted(cat["CARRERA_U"].unique())
     idx0 = carreras.index("ARQUITECTURA") if "ARQUITECTURA" in carreras else 0
     carrera_sel = st.selectbox("Carrera (escribe para buscar)", carreras, index=idx0)
+    st.markdown(f"<div class='sbfull'>📚 {carrera_sel}</div>", unsafe_allow_html=True)
     subset = cat[cat["CARRERA_U"] == carrera_sel].sort_values("univ_display")
     uni_sel = st.selectbox(f"Universidad · {len(subset)} opción(es)", subset["univ_display"].tolist())
+    st.markdown(f"<div class='sbfull'>🏛️ {uni_sel}</div>", unsafe_allow_html=True)
     st.markdown("**2 · Tu perfil**")
     if st.radio("Notas", ["Puntaje NEM", "Promedio de notas"], horizontal=True, label_visibility="collapsed", key="m_nem") == "Puntaje NEM":
         nem = st.number_input("Puntaje NEM (100–1000)", 100, 1000, 650, 5); promedio = None
@@ -507,7 +531,7 @@ v1, v2 = _vac("VACANTES_1SEM"), _vac("VACANTES_2SEM")
 vac_esp = _vac("CAR_VACANTES_PACE") + _vac("CDP_VACANTES_ESPECIALES") + _vac("VACANTES_GENERO")
 vac_total = v1 + v2 + vac_esp
 
-if st.session_state.get("tutorial"):
+if st.session_state.pop("_abrir_tutorial", False):   # flag transitorio: se consume al abrir → no reabre solo
     mostrar_tutorial()
 
 # ----------------------------------------------------------------- modo: MI RESULTADO
@@ -743,7 +767,7 @@ with tab4:
     mc1, mc2 = st.columns([1, 1.15])
     with mc1:
         if es_puntaje:
-            st.plotly_chart(fig_mapa_puntaje(art.territorio, cent, comuna, L), use_container_width=True, key="mapa_pje")
+            st.plotly_chart(fig_mapa_puntaje(art.territorio, geo, cent, comuna, L), use_container_width=True, key="mapa_pje")
         else:
             st.plotly_chart(fig_mapa(art.territorio, geo, cent, region, comuna, L), use_container_width=True, key="mapa")
     with mc2:
