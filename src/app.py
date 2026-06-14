@@ -956,8 +956,9 @@ postulante, por eso esta cifra se reporta como contexto, no como variable objeti
 pueden superar a los seleccionados (ingresos vía lista de espera u otras preferencias).
 
 **Cómo se predice el puntaje (percentiles, en simple):** no es una fórmula. Para cada prueba entrenamos un
-modelo de *regresión por cuantiles* (gradient boosting) que aprende, a partir de **notas + contexto**, no un
-único número sino **tres percentiles** de lo que sacan estudiantes parecidos:
+modelo de *regresión por cuantiles* (gradient boosting) que aprende, a partir de **notas + contexto** (y el
+**historial PAES de tu colegio** si lo indicas, vía el Directorio MINEDUC), no un único número sino **tres
+percentiles** de lo que sacan estudiantes parecidos:
 - **P10** = solo el 10% saca *menos* (escenario bajo)
 - **P50 / mediana** = la mitad saca menos y la mitad más (lo típico)
 - **P90** = solo el 10% saca *más* (escenario alto)
