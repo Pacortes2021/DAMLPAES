@@ -159,6 +159,33 @@ def fig_corte_trend(hist: dict):
     return fig
 
 
+def fig_seleccion(s: dict, user_pond, corte, anio: int, es_real: bool):
+    """Boxplot horizontal del ponderado de los seleccionados (5 números) + el corte + tu ponderado."""
+    fig = go.Figure()
+    fig.add_trace(go.Box(q1=[s["p25"]], median=[s["p50"]], q3=[s["p75"]],
+        lowerfence=[s["p05"]], upperfence=[s["p95"]], orientation="h", y=["sel"], name="",
+        fillcolor="rgba(37,99,235,.18)", line=dict(color=AZUL, width=2),
+        whiskerwidth=.6, showlegend=False, hoverinfo="skip"))
+    if corte:                                              # corte = mínimo histórico, referencia roja
+        fig.add_vline(x=corte, line=dict(color="#dc2626", width=2, dash="dot"),
+                      annotation_text=f"corte {corte:.0f}", annotation_position="top left",
+                      annotation_font=dict(color="#dc2626", size=11))
+    if user_pond is not None:                              # tú = diamante verde
+        fig.add_trace(go.Scatter(x=[user_pond], y=["sel"], mode="markers",
+            marker=dict(symbol="diamond", size=17, color="#16a34a", line=dict(width=2, color="white")),
+            showlegend=False, hovertemplate=f"Tu ponderado: {user_pond:.0f}<extra></extra>"))
+        fig.add_annotation(x=user_pond, y="sel", text=f"<b>{user_pond:.0f}</b> · tú",
+                           showarrow=True, arrowhead=2, ay=-34, font=dict(color="#15803d", size=12))
+    lo = min(s["p05"], corte or 9e9, user_pond if user_pond is not None else 9e9) - 25
+    hi = max(s["p95"], user_pond if user_pond is not None else 0) + 25
+    fig.update_layout(height=240, margin=dict(l=10, r=18, t=46, b=10),
+        title=dict(text=f"📊 ¿Con qué puntaje entró la gente? · seleccionados {anio} (n={s['n']})",
+                   font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(title="Puntaje ponderado", range=[lo, hi], showgrid=True, gridcolor="#eef"),
+        yaxis=dict(showticklabels=False), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
 def fig_pie_genero(s, titulo):
     """Torta de proporción por género de los titulados."""
     pm, ph = s["pct_muj"], s["pct_hom"]
@@ -602,64 +629,86 @@ def render_resultado():
         st.info("Completa **NEM/notas y ranking** en la barra lateral ⬅️ para ver tu resultado.")
         return
     st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
-    _ppre = _vres["p_pre"]
-    _pond50, _ = _esc("p50")
-    _, _plo = _esc("p10")
-    _, _phi = _esc("p90")
     _corte = _vres["corte"]
-    _gap = (_corte - _pond50) if (_corte and _pond50 is not None) else None
+    _es_real = es_post                                     # ¿hay puntajes PAES reales? → un solo modelo/gráfico
+
+    if _es_real:                                           # POST: puntajes PAES reales
+        _res2 = predecir(art, perfil_post)
+        _p, _pond = _res2["p_post"], _res2["ponderado"]
+        _gtit = "Probabilidad de acceso (con tu PAES)"
+        st.caption("✅ Resultado con tus **puntajes PAES reales**. Con el puntaje, el origen ya no cambia el resultado.")
+    else:                                                  # PRE: estimación desde notas + contexto
+        _p, _pond = _vres["p_pre"], _esc("p50")[0]
+        _gtit = "Probabilidad de acceso (estimada)"
+        st.caption("🔮 **Estimación antes de la PAES**, a partir de tus notas y contexto. "
+                   "Ingresa tus puntajes PAES en la barra lateral ⬅️ para ver el resultado real.")
+    _gap = (_corte - _pond) if (_corte and _pond is not None) else None
+
     vc1, vc2 = st.columns([1, 1.35])
-    with vc1:
-        st.plotly_chart(gauge(_ppre, "Probabilidad de acceso (PRE)"), use_container_width=True, key="ver_gauge")
+    vc1.plotly_chart(gauge(_p, _gtit), use_container_width=True, key="ver_gauge")
     with vc2:
         st.markdown("<br>", unsafe_allow_html=True)
         _vm = st.columns(3)
-        _vm[0].metric("🎯 Ponderado estimado", f"{_pond50:.0f}" if _pond50 is not None else "s/d")
+        _vm[0].metric("Tu ponderado" if _es_real else "🎯 Ponderado estimado", f"{_pond:.0f}" if _pond is not None else "s/d")
         _vm[1].metric("Corte 2025", f"{_corte:.0f}" if _corte else "s/d")
         if _gap is not None:
-            _vm[2].metric("Margen estimado", f"{-_gap:+.0f}", delta=f"{-_gap:+.0f}")
+            _vm[2].metric("Tu margen" if _es_real else "Margen estimado", f"{-_gap:+.0f}", delta=f"{-_gap:+.0f}")
         if _gap is not None and _gap > 0:
-            st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado estimado (~{_pond50:.0f}) está "
-                        f"<b>{_gap:.0f} pts bajo el corte</b> ({_corte:.0f}) → necesitarías subir <b>~{_gap:.0f} pts "
-                        f"en cada prueba</b>.</div>", unsafe_allow_html=True)
+            if _es_real:
+                st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado (<b>{_pond:.0f}</b>) está "
+                            f"<b>{_gap:.0f} pts bajo el corte</b> ({_corte:.0f}).</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado estimado (~{_pond:.0f}) está "
+                            f"<b>{_gap:.0f} pts bajo el corte</b> ({_corte:.0f}) → necesitarías subir "
+                            f"<b>~{_gap:.0f} pts en cada prueba</b>.</div>", unsafe_allow_html=True)
         elif _gap is not None:
-            st.markdown(f"<div class='nota'>✅ <b>Vas bien:</b> tu ponderado estimado (~{_pond50:.0f}) <b>supera el corte</b> "
-                        f"({_corte:.0f}) por ~{-_gap:.0f} pts. Igual depende de cómo rindas.</div>", unsafe_allow_html=True)
-        if _plo is not None and _phi is not None:
-            st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> bajo (P10) ~<b>{_plo:.0%}</b>; "
-                        f"alto (P90) ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>", unsafe_allow_html=True)
+            if _es_real:
+                st.markdown(f"<div class='nota'>✅ <b>Sobre el corte:</b> tu ponderado (<b>{_pond:.0f}</b>) supera el "
+                            f"corte ({_corte:.0f}) por <b>{-_gap:.0f} pts</b>.</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div class='nota'>✅ <b>Vas bien:</b> tu ponderado estimado (~{_pond:.0f}) supera el corte "
+                            f"({_corte:.0f}) por ~{-_gap:.0f} pts. Igual depende de cómo rindas.</div>", unsafe_allow_html=True)
+        if not _es_real:
+            _, _plo = _esc("p10"); _, _phi = _esc("p90")
+            if _plo is not None and _phi is not None:
+                st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> bajo (P10) ~<b>{_plo:.0%}</b>; "
+                            f"alto (P90) ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>", unsafe_allow_html=True)
+
+    # distribución del ponderado de los seleccionados (boxplot) + dónde caes tú
+    _sel = art.seleccion.get(str(cod))
+    if _sel and _pond is not None:
+        st.plotly_chart(fig_seleccion(_sel, _pond, _corte, _sel["anio"], _es_real), use_container_width=True, key="box_sel")
+        _pos = ("**por sobre la mediana**" if _pond >= _sel["p50"] else
+                "**dentro del 50% central**" if _pond >= _sel["p25"] else
+                "**bajo el 25% que entró más bajo**")
+        st.caption(f"📊 **Cómo leerlo:** la **caja azul** abarca al 50% central de quienes entraron en {_sel['anio']} "
+                   f"(del p25 al p75); la **línea** del medio es la **mediana** ({_sel['p50']:.0f} → la mitad entró con menos "
+                   f"y la mitad con más); los **bigotes** llegan del p5 al p95. La línea **roja** es el **corte** (el mínimo "
+                   f"con que entró alguien). El **diamante verde eres tú** ({'real' if _es_real else 'estimado'}): "
+                   f"caes {_pos}.")
+
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
+    _modo = "POST-PAES (puntajes reales)" if _es_real else "PRE-PAES (estimación por notas)"
     _lineas = [f"MI RESULTADO — {carrera_sel.title()} · {str(row['UNIV_U']).title()}",
                f"Región/comuna: {L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}", "",
-               f"Probabilidad de acceso (PRE-PAES): {_ppre:.0%}",
-               f"Ponderado estimado: ~{_pond50:.0f}" if _pond50 is not None else "Ponderado estimado: s/d"]
-    if _corte and _pond50 is not None:
-        _lineas.append(f"Corte 2025: {_corte:.0f}  ·  margen estimado: {(_pond50-_corte):+.0f}")
-    if _plo is not None:
-        _lineas.append(f"Rango de probabilidad según PAES: {_plo:.0%} (bajo) a {_phi:.0%} (alto)")
+               f"Probabilidad de acceso [{_modo}]: {_p:.0%}",
+               (f"Tu ponderado: {_pond:.0f}" if _es_real else f"Ponderado estimado: ~{_pond:.0f}")
+               if _pond is not None else "Ponderado: s/d"]
+    if _corte and _pond is not None:
+        _lineas.append(f"Corte 2025: {_corte:.0f}  ·  margen: {(_pond-_corte):+.0f}")
+    if _sel:
+        _lineas.append(f"Seleccionados {_sel['anio']}: entraron entre {_sel['p05']:.0f} y {_sel['p95']:.0f} "
+                       f"(mediana {_sel['p50']:.0f})")
     if _tq:
         _lineas.append(f"Titulación: {_tq['pct_muj']:.0f}% mujeres · edad mediana {_tq['edad_mediana']:.0f} años")
     _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía."]
     st.download_button("📄 Descargar mi resumen", data="\n".join(_lineas), file_name="mi_resultado_PAES.txt", key="dl_resumen")
 
-    if es_post:                                            # resultado con puntajes PAES reales
-        res2 = predecir(art, perfil_post)
-        if res2["p_post"] is not None:
-            st.markdown("<div class='sec'><h3>✅ Con tus puntajes reales</h3></div>", unsafe_allow_html=True)
-            pc1, pc2 = st.columns([1, 1.2])
-            pc1.plotly_chart(gauge(res2["p_post"], "Probabilidad (POST-PAES)"), use_container_width=True, key="res_gpost")
-            with pc2:
-                st.markdown("<br>", unsafe_allow_html=True)
-                pm = st.columns(3)
-                pm[0].metric("Tu ponderado", f"{res2['ponderado']:.0f}" if res2['ponderado'] else "s/d")
-                pm[1].metric("Corte 2025", f"{res2['corte']:.0f}" if res2['corte'] else "s/d")
-                if res2['margen'] is not None and res2['margen'] == res2['margen']:
-                    pm[2].metric("Margen", f"{res2['margen']:+.0f}", delta=f"{res2['margen']:+.0f}")
-
-    with st.expander("🔬 Ver detalle: tu puntaje PAES probable y el efecto del origen"):
-        st.plotly_chart(fig_bandas(_vbanda), use_container_width=True, key="bandas")
-        st.caption("De cada 100 estudiantes con tu perfil, ~80 sacan un puntaje dentro de la banda; el punto es la mediana.")
+    with st.expander("🔬 Ver detalle: efecto del origen" + ("" if _es_real else " y tu puntaje PAES probable")):
+        if not _es_real:
+            st.plotly_chart(fig_bandas(_vbanda), use_container_width=True, key="bandas")
+            st.caption("De cada 100 estudiantes con tu perfil, ~80 sacan un puntaje dentro de la banda; el punto es la mediana.")
         cfp = cf_dependencia(perfil_base, "pre")
         if cfp:
             st.plotly_chart(fig_cf(cfp, "Probabilidad según tipo de colegio — mismo perfil académico", AZUL),

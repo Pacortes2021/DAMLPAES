@@ -105,6 +105,19 @@ def test_titulacion_stats_valido():
         assert 0 <= ici["pct_muj"] <= 100
 
 
+def test_seleccion_stats_valido():
+    f = _P("data/processed/seleccion_stats.json")
+    if not os.path.exists(f):
+        return
+    d = json.load(open(f))
+    assert len(d) > 500
+    for v in list(d.values())[:80]:
+        # 5 números ordenados y en escala PAES nueva (≤1000); cohorte reciente (no escala 850)
+        assert v["p05"] <= v["p25"] <= v["p50"] <= v["p75"] <= v["p95"]
+        assert 100 <= v["p05"] and v["p95"] <= 1000
+        assert v["anio"] >= 2024 and v["n"] >= 15
+
+
 def test_oferta_detalle_valido():
     f = _P("data/processed/oferta_detalle.json")
     if not os.path.exists(f):
