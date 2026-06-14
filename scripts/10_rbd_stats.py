@@ -20,8 +20,10 @@ import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, "data/raw/directorio_ee_2024.csv")
-# ArchivoC recientes (misma escala): 2025 y 2026, ambos en el repo
+# ArchivoC recientes (MISMA escala 100–1000): 2024, 2025 y 2026. Más años = más n por colegio
+# (medias más estables, sobre todo en comunas/colegios chicos). 2023 y anteriores quedan fuera por escala.
 ARCHIVOC = {
+    2024: glob.glob(os.path.join(ROOT, "data/raw/ArchivoC_Adm2024.csv")),
     2025: glob.glob(os.path.join(ROOT, "data/raw/**/ArchivoC_Adm2025.csv"), recursive=True),
     2026: glob.glob(os.path.join(ROOT, "data/raw/ArchivoC_Adm2026REG.csv")),
 }
@@ -46,7 +48,7 @@ def cargar_archivoc(anio, path):
     return df
 
 
-print("Cargando ArchivoC 2025/2026 ...")
+print(f"Cargando ArchivoC {sorted(ARCHIVOC)} ...")
 acs = []
 for anio, paths in ARCHIVOC.items():
     if not paths:
