@@ -598,9 +598,14 @@ with st.sidebar:
     _ops = sorted([(r, c["nom"]) for r, c in _cols.items()
                    if c.get("com_cod") == _ccod and c.get("dep") == dependencia], key=lambda t: t[1])
     _nm = {r: n for r, n in _ops}
+    # key dinámico: al cambiar región/comuna/dependencia el selector se RESETEA (evita arrastrar un
+    # colegio de otra comuna/dependencia, bug de estado de Streamlit que metía un RBD incoherente).
     rbd_sel = st.selectbox("🏫 Tu colegio (opcional)", [None] + [r for r, _ in _ops],
                            format_func=lambda r: "— No especificar —" if r is None else _nm.get(r, r),
+                           key=f"colegio_{region}_{comuna}_{dependencia}",
                            help="Lista filtrada por tu comuna y dependencia. Afina la estimación PRE-PAES con el historial de tu colegio. Opcional.")
+    if rbd_sel is not None and rbd_sel not in _nm:   # red de seguridad: solo un RBD del filtro actual
+        rbd_sel = None
     if not _ops:
         st.caption(f"Sin colegios **{L['dependencia'].get(dependencia, '')}** con historial en esta comuna. "
                    "Cambia la dependencia si no ves el tuyo; si no, se usa el promedio comunal.")
