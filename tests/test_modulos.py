@@ -57,7 +57,10 @@ def _artifacts():
     try:
         from inference import load_artifacts
         return load_artifacts()
-    except Exception:
+    except Exception as e:  # noqa: BLE001
+        # AVISO VISIBLE: si los artefactos no cargan, los tests de modelo se omiten pero NO en silencio
+        # (un entorno con numpy viejo no puede deserializar los .joblib y antes esto pasaba desapercibido).
+        print(f"  ⚠️ artifacts no cargan ({type(e).__name__}: {e}) — tests de modelo OMITIDOS")
         return None
 
 
