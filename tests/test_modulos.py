@@ -121,6 +121,31 @@ def test_seleccion_stats_valido():
         assert v["anio"] >= 2024 and v["n"] >= 15
 
 
+def test_demanda_hist_valido():
+    f = _P("data/processed/demanda_hist.json")
+    if not os.path.exists(f):
+        return
+    d = json.load(open(f))
+    assert len(d) > 1000
+    for v in list(d.values())[:80]:
+        for anio, n in v.items():
+            assert 2018 <= int(anio) <= 2026 and n >= 1
+
+
+def test_copostulacion_valido():
+    f = _P("data/processed/copostulacion.json")
+    if not os.path.exists(f):
+        return
+    d = json.load(open(f))
+    assert len(d) > 500
+    for cod, v in list(d.items())[:80]:
+        assert v["n1"] >= 20
+        pcts = [t["pct"] for t in v["top"]]
+        assert pcts == sorted(pcts, reverse=True)              # top ordenado desc
+        assert all(0 < p <= 100 for p in pcts)
+        assert all(str(t["cod"]) != cod for t in v["top"])     # nunca se lista a sí misma
+
+
 def test_rbd_stats_valido():
     f = _P("data/processed/rbd_stats.json")
     if not os.path.exists(f):

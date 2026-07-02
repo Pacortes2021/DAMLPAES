@@ -40,6 +40,8 @@ class Artifacts:
     oferta: dict                      # detalle institucional por carrera (nivel, jornada, duración, sede, origen) SIES
     seleccion: dict                   # distribución del ponderado de los seleccionados por carrera (cohorte reciente)
     rbd_stats: dict                   # media histórica PAES por colegio (RBD) + respaldo comuna/global
+    demanda: dict                     # postulantes 1ª pref por carrera y año 2018-2026 (conteos, sin escala)
+    copost: dict                      # co-postulación: a qué otras carreras postula quien pone ésta de 1ª
 
 
 def _load_json_opt(path, default):
@@ -69,6 +71,8 @@ def load_artifacts() -> Artifacts:
         oferta=_load_json_opt(_P("data/processed/oferta_detalle.json"), {}),
         seleccion=_load_json_opt(_P("data/processed/seleccion_stats.json"), {}),
         rbd_stats=_load_json_opt(_P("data/processed/rbd_stats.json"), {"colegios": {}, "comuna": {}, "global": {}}),
+        demanda=_load_json_opt(_P("data/processed/demanda_hist.json"), {}),
+        copost=_load_json_opt(_P("data/processed/copostulacion.json"), {}),
     )
 
 

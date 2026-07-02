@@ -62,7 +62,12 @@ com_m = {int(c): {p: round(float(v), 1) for p, v in row.items() if v == v}
          for c, row in ac.groupby("CODIGO_COMUNA")[PRUEBAS].mean().iterrows() if c == c}
 g = ac.dropna(subset=["RBD"]).groupby("RBD")
 rbd_m = g[PRUEBAS].mean()
+rbd_cnt = g[PRUEBAS].count()      # n de rendiciones VÁLIDAS por prueba (difiere entre pruebas)
 rbd_n = g.size()
+# SHRINKAGE (empirical Bayes): la media de un colegio chico es ruidosa; se mezcla con la media de su
+# comuna ponderando por n:  m* = (n·m_colegio + K·m_comuna) / (n + K).  Con K=20, un colegio con n=10
+# pesa 1/3 su propia señal; con n=200 pesa ~91%. Estabiliza los extremos por azar sin borrar la señal.
+K_SHRINK = 20
 # dependencia REAL del colegio (modal de sus alumnos) → para filtrar el selector de forma coherente
 dep_modal = (ac.dropna(subset=["RBD", "DEP"]).groupby("RBD")["DEP"]
              .agg(lambda s: int(s.mode().iloc[0])))
@@ -80,13 +85,19 @@ for rbd, fila in rbd_m.iterrows():
     n = int(rbd_n.loc[rbd])
     if n < MIN_N:
         continue
-    medias = {p: round(float(v), 1) for p, v in fila.items() if v == v}
-    if not medias:
-        continue
     info = dire.loc[rbd] if rbd in dire.index else None
     nom = str(info["NOM_RBD"]).title() if info is not None else f"RBD {int(rbd)}"
     com = str(info["NOM_COM_RBD"]).title() if info is not None else ""
     com_cod = int(info["COD_COM_RBD"]) if info is not None and info["COD_COM_RBD"] == info["COD_COM_RBD"] else None
+    medias = {}
+    for p, v in fila.items():
+        if v != v:
+            continue
+        n_p = float(rbd_cnt.loc[rbd, p])
+        prior = (com_m.get(com_cod) or {}).get(p, glob_m[p])       # media comunal; si no, global
+        medias[p] = round((n_p * float(v) + K_SHRINK * prior) / (n_p + K_SHRINK), 1)
+    if not medias:
+        continue
     reg_cod = int(info["COD_REG_RBD"]) if info is not None and info["COD_REG_RBD"] == info["COD_REG_RBD"] else None
     dep = dep_modal.get(rbd)
     colegios[str(int(rbd))] = {"nom": nom, "comuna": com, "com_cod": com_cod, "reg_cod": reg_cod,

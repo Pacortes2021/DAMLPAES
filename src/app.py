@@ -186,6 +186,52 @@ def fig_seleccion(s: dict, user_pond, corte, anio: int, es_real: bool):
     return fig
 
 
+def fig_demanda(dem: dict):
+    """Línea de postulantes en 1ª preferencia por año (2018–2026). Los conteos no dependen de la
+    escala de puntajes, así que la serie completa es comparable. None si <3 años."""
+    yrs = sorted(dem)
+    vals = [dem[y] for y in yrs]
+    if len(yrs) < 3:
+        return None
+    delta = vals[-1] - vals[0]
+    fig = go.Figure(go.Scatter(x=yrs, y=vals, mode="lines+markers", fill="tozeroy",
+        fillcolor="rgba(37,99,235,.10)", line=dict(color=AZUL, width=3), marker=dict(size=7),
+        hovertemplate="%{x}: <b>%{y}</b> postulantes<extra></extra>"))
+    fig.add_annotation(x=yrs[-1], y=vals[-1], text=f"<b>{vals[-1]}</b>", showarrow=False, yshift=14,
+                       font=dict(color=AZUL_OSC, size=12))
+    fig.update_layout(height=240, margin=dict(l=10, r=14, t=42, b=6),
+        title=dict(text=f"📈 Postulantes en 1ª preferencia · {delta:+d} desde {yrs[0]}",
+                   font=dict(size=13, color=AZUL_OSC)),
+        yaxis=dict(rangemode="tozero", showgrid=True, gridcolor="#eef"),
+        xaxis=dict(showgrid=False, type="category"), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
+def fig_copost(cp: dict, cat_idx: pd.DataFrame):
+    """Barras: a qué otras carreras postulan quienes ponen ésta de 1ª preferencia (top rivales)."""
+    items = []
+    for t in cp.get("top", []):
+        if t["cod"] not in cat_idx.index:
+            continue
+        c = cat_idx.loc[t["cod"]]
+        if isinstance(c, pd.DataFrame):
+            c = c.iloc[0]
+        lbl = f"{str(c['NOMBRE_CARRERA']).title()[:26]} · {str(c['NOMBRE_UNIVERSIDAD']).title()[:22]}"
+        items.append((lbl, t["pct"]))
+    if not items:
+        return None
+    items.reverse()                                        # mayor arriba
+    fig = go.Figure(go.Bar(x=[v for _, v in items], y=[k for k, _ in items], orientation="h",
+        marker_color=AZUL, text=[f"{v:.0f}%" for _, v in items], textposition="outside",
+        textfont=dict(color=AZUL_OSC, size=11)))
+    fig.update_layout(height=max(220, 38 * len(items) + 60), margin=dict(l=8, r=34, t=42, b=8),
+        title=dict(text=f"🔀 ¿A qué más postulan? · {cp['n1']} postulantes de 1ª pref ({cp['anio']})",
+                   font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(range=[0, max(v for _, v in items) * 1.2], ticksuffix="%", showgrid=False),
+        yaxis=dict(tickfont=dict(size=10)), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
 def fig_pie_genero(s, titulo):
     """Torta de proporción por género de los titulados."""
     pm, ph = s["pct_muj"], s["pct_hom"]
@@ -719,8 +765,10 @@ def render_resultado():
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
     _modo = "POST-PAES (puntajes reales)" if _es_real else "PRE-PAES (estimación por notas)"
+    _col_nom = (art.rbd_stats.get("colegios", {}).get(str(perfil_base.rbd)) or {}).get("nom") if perfil_base.rbd else None
     _lineas = [f"MI RESULTADO — {carrera_sel.title()} · {str(row['UNIV_U']).title()}",
-               f"Región/comuna: {L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}", "",
+               f"Región/comuna: {L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}"
+               + (f"  ·  colegio: {_col_nom}" if _col_nom else ""), "",
                f"Probabilidad de acceso [{_modo}]: {_p:.0%}",
                (f"Tu ponderado: {_pond:.0f}" if _es_real else f"Ponderado estimado: ~{_pond:.0f}")
                if _pond is not None else "Ponderado: s/d"]
@@ -729,6 +777,10 @@ def render_resultado():
     if _sel:
         _lineas.append(f"Seleccionados {_sel['anio']}: entraron entre {_sel['p05']:.0f} y {_sel['p95']:.0f} "
                        f"(mediana {_sel['p50']:.0f})")
+        if _pond is not None:
+            _lineas.append("Tu posición vs los seleccionados: "
+                           + ("sobre la mediana" if _pond >= _sel["p50"] else
+                              "en el 50% central" if _pond >= _sel["p25"] else "bajo el 25% más bajo"))
     if _tq:
         _lineas.append(f"Titulación: {_tq['pct_muj']:.0f}% mujeres · edad mediana {_tq['edad_mediana']:.0f} años")
     _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía."]
@@ -788,6 +840,21 @@ with tab_car:
             _ftrend = fig_corte_trend(_ch)
             if _ftrend is not None:
                 st.plotly_chart(_ftrend, use_container_width=True, key="corte_trend")
+    _dem = art.demanda.get(str(cod))                      # demanda histórica + con quién compite
+    _cp = art.copost.get(str(cod))
+    if _dem or _cp:
+        st.markdown("<div class='sec'><h3>📊 Demanda y competencia</h3></div>", unsafe_allow_html=True)
+        dc1, dc2 = st.columns([1, 1.15])
+        _fdem = fig_demanda(_dem) if _dem else None
+        if _fdem is not None:
+            dc1.plotly_chart(_fdem, use_container_width=True, key="demanda")
+            dc1.caption("Cuántos la pusieron como **1ª preferencia** cada año (admisión regular). "
+                        "Más postulantes por cupo = más competencia.")
+        _fcp = fig_copost(_cp, cat_idx) if _cp else None
+        if _fcp is not None:
+            dc2.plotly_chart(_fcp, use_container_width=True, key="copost")
+            dc2.caption("**Las carreras que compiten por los mismos estudiantes:** % de quienes pusieron "
+                        "esta carrera de 1ª pref que también postuló a cada una. Útiles como plan B.")
     if of and of.get("tes"):                              # origen escolar de los matriculados (TES, SIES)
         st.markdown("<div class='sec'><h3>🏫 ¿De qué colegios vienen sus matriculados?</h3></div>", unsafe_allow_html=True)
         oc1, oc2 = st.columns([1.3, 1])
