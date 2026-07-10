@@ -177,13 +177,16 @@ def build_labels():
 
 
 def build_territorio_stats():
-    """Tasa histórica de acceso a 1ª preferencia por región y por comuna (contexto territorial)."""
-    d = pl.read_parquet(P("data/processed/dataset_modelo_acceso.parquet"))
+    """Tasa de acceso a 1ª pref + puntaje PAES promedio (CLEC+MATE1)/2 por región y comuna."""
+    d = pl.read_parquet(P("data/processed/dataset_modelo_acceso.parquet")) \
+          .with_columns(((pl.col("CLEC") + pl.col("MATE1")) / 2).alias("_pje"))
     stats = {}
     for col, name in [("CODIGO_REGION", "region"), ("CODIGO_COMUNA", "comuna")]:
         g = (d.filter(pl.col(col).is_not_null())
-             .group_by(col).agg(pl.col("ACCESO_1PREF").mean().alias("tasa"), pl.len().alias("n")))
-        stats[name] = {str(r[col]): {"tasa": float(r["tasa"]), "n": int(r["n"])}
+             .group_by(col).agg(pl.col("ACCESO_1PREF").mean().alias("tasa"),
+                                pl.col("_pje").mean().alias("puntaje"), pl.len().alias("n")))
+        stats[name] = {str(r[col]): {"tasa": float(r["tasa"]), "n": int(r["n"]),
+                                     "puntaje": (round(float(r["puntaje"]), 1) if r["puntaje"] is not None else None)}
                        for r in g.iter_rows(named=True)}
     json.dump(stats, open(P("data/processed/territorio_stats.json"), "w"))
     print(f"   ✅ territorio_stats.json  (regiones={len(stats['region'])}, comunas={len(stats['comuna'])})")

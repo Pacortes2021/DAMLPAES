@@ -25,3 +25,4 @@ legacy/
 
 # ── Respaldo de historial git antiguo (si se crea) ────────────────
 .git_backup*/
+.venv/
