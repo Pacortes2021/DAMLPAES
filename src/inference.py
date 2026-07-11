@@ -42,6 +42,7 @@ class Artifacts:
     rbd_stats: dict                   # media histórica PAES por colegio (RBD) + respaldo comuna/global
     demanda: dict                     # postulantes 1ª pref por carrera y año 2018-2026 (conteos, sin escala)
     copost: dict                      # co-postulación: a qué otras carreras postula quien pone ésta de 1ª
+    empleabilidad_ingresos: dict      # empleabilidad e ingresos por área (SIES/Mifuturo)
 
 
 def _load_json_opt(path, default):
@@ -73,6 +74,7 @@ def load_artifacts() -> Artifacts:
         rbd_stats=_load_json_opt(_P("data/processed/rbd_stats.json"), {"colegios": {}, "comuna": {}, "global": {}}),
         demanda=_load_json_opt(_P("data/processed/demanda_hist.json"), {}),
         copost=_load_json_opt(_P("data/processed/copostulacion.json"), {}),
+        empleabilidad_ingresos=_load_json_opt(_P("data/processed/sies_empleabilidad_ingresos.json"), {}),
     )
 
 
@@ -227,8 +229,8 @@ def predecir(art: Artifacts, perfil: Perfil) -> dict:
     return out
 
 
-def rbd_hist(rbd_stats: dict, rbd, comuna, prueba: str):
-    """Media histórica PAES del colegio para la prueba; respaldo: media de comuna → global.
+def rbd_hist(rbd_stats: dict, rbd, comuna, region, prueba: str):
+    """Media histórica PAES del colegio para la prueba; respaldo: media de comuna → región → global.
     Igual que en el entrenamiento (scripts/11_retrain_score_rbd.py)."""
     if rbd is not None:
         c = rbd_stats.get("colegios", {}).get(str(rbd))
@@ -237,6 +239,9 @@ def rbd_hist(rbd_stats: dict, rbd, comuna, prueba: str):
     cm = rbd_stats.get("comuna", {}).get(str(comuna))
     if cm and prueba in cm:
         return cm[prueba]
+    rg = rbd_stats.get("region", {}).get(str(region))
+    if rg and prueba in rg:
+        return rg[prueba]
     g = rbd_stats.get("global", {}).get(prueba)
     return g if g is not None else np.nan
 
@@ -265,7 +270,7 @@ def predecir_puntaje(art: Artifacts, perfil: Perfil) -> dict:
     for prueba, qmodels in art.score_models.items():
         fila = dict(base)
         if usa_rbd:                                   # historial del colegio para ESTA prueba
-            fila["RBD_HIST"] = rbd_hist(art.rbd_stats, perfil.rbd, perfil.comuna, prueba)
+            fila["RBD_HIST"] = rbd_hist(art.rbd_stats, perfil.rbd, perfil.comuna, perfil.region, prueba)
         X = pd.DataFrame([fila])[num + cat]
         for c in cat:
             X[c] = X[c].astype("int32")

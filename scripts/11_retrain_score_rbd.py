@@ -42,12 +42,14 @@ print(f"   RBD asignado: {d['RBD'].notna().mean():.1%} de las filas")
 
 
 def rbd_hist_col(df, prueba):
-    """Media del colegio para la prueba; respaldo: media de comuna → global. (igual que en inferencia)"""
+    """Media del colegio para la prueba; respaldo: media de comuna → región → global. (igual que en inferencia)"""
     esc = {int(k): v["m"][prueba] for k, v in rbd_stats["colegios"].items() if prueba in v["m"]}
     com = {int(k): v[prueba] for k, v in rbd_stats["comuna"].items() if prueba in v}
+    reg = {int(k): v[prueba] for k, v in rbd_stats.get("region", {}).items() if prueba in v}
     g = rbd_stats["global"][prueba]
     s = df["RBD"].map(esc)
     s = s.fillna(df["CODIGO_COMUNA"].map(com))
+    s = s.fillna(df["CODIGO_REGION"].astype(float).fillna(-1).astype(int).map(reg))
     return s.fillna(g)
 
 
