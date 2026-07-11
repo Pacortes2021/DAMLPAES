@@ -56,10 +56,21 @@ for anio, paths in ARCHIVOC.items():
     acs.append(cargar_archivoc(anio, paths[0])); print(f"  {anio}: {len(acs[-1]):,} filas")
 ac = pd.concat(acs, ignore_index=True)
 
-# medias por prueba: por RBD, por comuna y global
+# medias por prueba: por RBD, por comuna, por región y global
 glob_m = {p: round(float(ac[p].mean()), 1) for p in PRUEBAS}
 com_m = {int(c): {p: round(float(v), 1) for p, v in row.items() if v == v}
          for c, row in ac.groupby("CODIGO_COMUNA")[PRUEBAS].mean().iterrows() if c == c}
+
+reg_m = {}
+for r, row in ac.groupby("CODIGO_REGION")[PRUEBAS].mean().iterrows():
+    if r != r:
+        continue
+    try:
+        r_key = str(int(float(r)))
+        reg_m[r_key] = {p: round(float(v), 1) for p, v in row.items() if v == v}
+    except (ValueError, TypeError):
+        reg_m[str(r).strip()] = {p: round(float(v), 1) for p, v in row.items() if v == v}
+
 g = ac.dropna(subset=["RBD"]).groupby("RBD")
 rbd_m = g[PRUEBAS].mean()
 rbd_cnt = g[PRUEBAS].count()      # n de rendiciones VÁLIDAS por prueba (difiere entre pruebas)
@@ -104,7 +115,7 @@ for rbd, fila in rbd_m.iterrows():
                                "dep": str(dep) if dep is not None else None,
                                "ramas": ramas_set.get(rbd, []), "n": n, "m": medias}
 
-out = {"pruebas": PRUEBAS, "anios": list(ARCHIVOC), "colegios": colegios, "comuna": com_m, "global": glob_m}
+out = {"pruebas": PRUEBAS, "anios": list(ARCHIVOC), "colegios": colegios, "comuna": com_m, "region": reg_m, "global": glob_m}
 json.dump(out, open(os.path.join(ROOT, "data/processed/rbd_stats.json"), "w"), ensure_ascii=False)
 con_nombre = sum(1 for c in colegios.values() if not c["nom"].startswith("RBD "))
 print(f"✅ rbd_stats.json — {len(colegios)} colegios (n≥{MIN_N}), {con_nombre} con nombre · "

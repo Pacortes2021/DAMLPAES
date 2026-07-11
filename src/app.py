@@ -22,8 +22,8 @@ st.markdown(f"""
 <style>
   .main .block-container {{max-width:1200px;padding-top:1rem;}}
   .stApp {{background:#f5f8ff;}}
-  section[data-testid="stSidebar"] {{width:370px!important;}}
-  section[data-testid="stSidebar"] > div {{width:370px!important;}}
+  section[data-testid="stSidebar"][data-collapsed="false"] {{width:370px!important;}}
+  section[data-testid="stSidebar"][data-collapsed="false"] > div {{width:370px!important;}}
   .sbfull {{font-size:.82rem;color:{AZUL_OSC};background:#eef3ff;border:1px solid #d6e2ff;
             border-radius:8px;padding:6px 9px;margin:-4px 0 4px 0;line-height:1.25;word-break:break-word;}}
   .hero {{background:linear-gradient(120deg,{AZUL_OSC} 0%,{AZUL} 70%,#3b82f6 100%);
@@ -49,6 +49,12 @@ st.markdown(f"""
   div[role="radiogroup"] label {{background:#eef3ff;border:1px solid #d6e2ff;border-radius:8px;padding:3px 10px;margin-right:5px;}}
   .stTabs [data-baseweb="tab"] {{font-size:1.02rem;font-weight:600;}}
   .stTabs [aria-selected="true"] {{color:{AZUL}!important;}}
+  div[data-testid="stPlotlyChart"] > div {{
+      border-radius: 16px !important;
+      overflow: hidden !important;
+      box-shadow: 0 4px 12px rgba(30, 58, 138, 0.05) !important;
+      border: 1px solid #e2e8f5 !important;
+  }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -150,48 +156,64 @@ def fig_corte_trend(hist: dict):
     col = "#16a34a" if delta < -3 else "#dc2626" if delta > 3 else AZUL   # bajó=más fácil, subió=más difícil
     fig = go.Figure(go.Scatter(x=yrs, y=vals, mode="lines+markers+text",
         text=[f"{v:.0f}" for v in vals], textposition="top center", textfont=dict(size=11, color=AZUL_OSC),
-        line=dict(color=col, width=3), marker=dict(size=9, color=col)))
+        line=dict(color=col, width=3), marker=dict(size=9, color=col),
+        hovertemplate="Proceso %{x}: <b>%{y:.0f} pts</b><extra></extra>"))
     fig.update_layout(height=200, margin=dict(l=10, r=14, t=42, b=6),
         title=dict(text=f"📈 Corte de la carrera · {delta:+.0f} pts en 3 años", font=dict(size=13, color=AZUL_OSC)),
         yaxis=dict(title="Corte (ponderado)", showgrid=True, gridcolor="#eef"),
-        xaxis=dict(showgrid=False), plot_bgcolor="white", paper_bgcolor="white",
-        yaxis_range=[min(vals) - 25, max(vals) + 30])
+        xaxis=dict(showgrid=False, type="category"), plot_bgcolor="white", paper_bgcolor="white",
+        yaxis_range=[min(vals) - 25, max(vals) + 30], hovermode="closest")
     return fig
 
 
-def fig_seleccion(s: dict, user_pond, corte, anio: int, es_real: bool):
+def fig_seleccion(s: dict, user_pond, corte, anio: int, es_real: bool, p: float):
     """Boxplot horizontal del ponderado de los seleccionados (5 números) + el corte + tu ponderado."""
     fig = go.Figure()
     fig.add_trace(go.Box(q1=[s["p25"]], median=[s["p50"]], q3=[s["p75"]],
-        lowerfence=[s["p05"]], upperfence=[s["p95"]], orientation="h", y=["sel"], name="",
+        lowerfence=[s["p05"]], upperfence=[s["p95"]], orientation="h", y=["sel"], name="Seleccionados",
         fillcolor="rgba(37,99,235,.18)", line=dict(color=AZUL, width=2),
         whiskerwidth=.6, showlegend=False, hoverinfo="skip"))
+    
+    # Marcadores invisibles para hover individual por punto
+    fig.add_trace(go.Scatter(
+        x=[s["p05"], s["p25"], s["p50"], s["p75"], s["p95"]],
+        y=["sel", "sel", "sel", "sel", "sel"],
+        mode="markers",
+        marker=dict(size=14, color="rgba(0,0,0,0)"),
+        text=["Mínimo (p05)", "Q1 (p25)", "Mediana (p50)", "Q3 (p75)", "Máximo (p95)"],
+        hovertemplate="<b>%{text}</b>: %{x:.0f}<extra></extra>",
+        showlegend=False
+    ))
+    
     if corte:                                              # corte del MISMO año de la caja (piso de admisión)
         fig.add_vline(x=corte, line=dict(color="#dc2626", width=2, dash="dot"),
                       annotation_text=f"corte {anio}: {corte:.0f}", annotation_position="top left",
                       annotation_font=dict(color="#dc2626", size=11))
-    if user_pond is not None:                              # tú = diamante verde
+    if user_pond is not None:                              # tú = círculo
+        color = "#16a34a" if p >= .66 else "#f59e0b" if p >= .33 else "#dc2626"
+        text_color = "#15803d" if p >= .66 else "#b45309" if p >= .33 else "#b91c1c"
         fig.add_trace(go.Scatter(x=[user_pond], y=["sel"], mode="markers",
-            marker=dict(symbol="diamond", size=17, color="#16a34a", line=dict(width=2, color="white")),
+            marker=dict(symbol="circle", size=18, color=color, line=dict(width=2, color="white")),
             showlegend=False, hovertemplate=f"Tu ponderado: {user_pond:.0f}<extra></extra>"))
         fig.add_annotation(x=user_pond, y="sel", text=f"<b>{user_pond:.0f}</b> · tú",
-                           showarrow=True, arrowhead=2, ay=-34, font=dict(color="#15803d", size=12))
+                           showarrow=True, arrowhead=2, ax=0, ay=-48, font=dict(color=text_color, size=12))
     lo = min(s["p05"], corte or 9e9, user_pond if user_pond is not None else 9e9) - 25
     hi = max(s["p95"], user_pond if user_pond is not None else 0) + 25
     fig.update_layout(height=240, margin=dict(l=10, r=18, t=46, b=10),
         title=dict(text=f"📊 ¿Con qué puntaje entró la gente? · seleccionados {anio} (n={s['n']})",
                    font=dict(size=13, color=AZUL_OSC)),
         xaxis=dict(title="Puntaje ponderado", range=[lo, hi], showgrid=True, gridcolor="#eef"),
-        yaxis=dict(showticklabels=False), plot_bgcolor="white", paper_bgcolor="white")
+        yaxis=dict(showticklabels=False), plot_bgcolor="white", paper_bgcolor="white",
+        hovermode="closest")
     return fig
 
 
 def fig_demanda(dem: dict):
-    """Línea de postulantes en 1ª preferencia por año (2018–2026). Los conteos no dependen de la
-    escala de puntajes, así que la serie completa es comparable. None si <3 años."""
-    yrs = sorted(dem)
-    vals = [dem[y] for y in yrs]
-    if len(yrs) < 3:
+    """Línea de postulantes en 1ª preferencia por año (2018–2026). None si no hay datos."""
+    # Convertimos los años a enteros para evitar bugs de Plotly con strings numéricos
+    yrs = [int(y) for y in sorted(dem)]
+    vals = [dem[str(y)] for y in yrs]
+    if not yrs:
         return None
     delta = vals[-1] - vals[0]
     fig = go.Figure(go.Scatter(x=yrs, y=vals, mode="lines+markers", fill="tozeroy",
@@ -203,7 +225,7 @@ def fig_demanda(dem: dict):
         title=dict(text=f"📈 Postulantes en 1ª preferencia · {delta:+d} desde {yrs[0]}",
                    font=dict(size=13, color=AZUL_OSC)),
         yaxis=dict(rangemode="tozero", showgrid=True, gridcolor="#eef"),
-        xaxis=dict(showgrid=False, type="category"), plot_bgcolor="white", paper_bgcolor="white")
+        xaxis=dict(showgrid=False, dtick=1), plot_bgcolor="white", paper_bgcolor="white")
     return fig
 
 
@@ -275,19 +297,21 @@ def ficha_oferta_html(of: dict) -> str:
     g = lambda x: f"{x:g}"
     chips = []
     if of.get("nivel"):
-        chips.append(f"<span class='pchip ob'>🎓 {of['nivel']}</span>")
+        chips.append(f"<span class='pchip' style='background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; font-weight:600;'>🎓 {of['nivel']}</span>")
     if of.get("jornada"):
         otras = [j for j in of.get("jornadas", []) if j != of["jornada"]]
-        chips.append(f"<span class='pchip'>🕗 {of['jornada']}" + (f" +{len(otras)}" if otras else "") + "</span>")
+        j_txt = of["jornada"] + (f" +{len(otras)}" if otras else "")
+        chips.append(f"<span class='pchip' style='background:#fffbeb; border-color:#fde68a; color:#b45309; font-weight:600;'>🕗 {j_txt}</span>")
     if of.get("dur_sem"):
         a = of.get("dur_anios")
-        chips.append(f"<span class='pchip'>⏳ {g(of['dur_sem'])} sem" + (f" · {g(a)} años" if a else "") + "</span>")
+        d_txt = f"{g(of['dur_sem'])} sem" + (f" · {g(a)} años" if a else "")
+        chips.append(f"<span class='pchip' style='background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; font-weight:600;'>⏳ {d_txt}</span>")
     loc = " · ".join(x for x in [of.get("comuna"), of.get("region")] if x)
     if loc:
-        chips.append(f"<span class='pchip'>📍 {loc}</span>")
+        chips.append(f"<span class='pchip' style='background:#f0fdf4; border-color:#bbf7d0; color:#15803d; font-weight:600;'>📍 {loc}</span>")
     if of.get("sede"):
-        chips.append(f"<span class='pchip'>🏛️ {of['sede']}</span>")
-    return "<div class='pchips' style='margin-top:8px'>" + "".join(chips) + "</div>"
+        chips.append(f"<span class='pchip' style='background:#fff1f2; border-color:#fecdd3; color:#be123c; font-weight:600;'>🏛️ {of['sede']}</span>")
+    return "<div class='pchips' style='margin-top:8px; margin-bottom:12px;'>" + "".join(chips) + "</div>"
 
 
 def tit_fila(etiqueta, s) -> dict:
@@ -360,7 +384,7 @@ def fig_mapa(territorio, geo, cent, region_sel, comuna_sel, L):
             hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
     # encuadre fijo a Chile CONTINENTAL (excluye Isla de Pascua ~-109° y la Antártica, que distorsionan)
     fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
-                    lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
+                    lonaxis_range=[-85.0, -57.0], lataxis_range=[-56.0, -17.3])
     fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
     return fig
 
@@ -401,7 +425,7 @@ def fig_mapa_puntaje(territorio, geo, cent, comuna_sel, L):
             text=["📍"], textposition="middle center", textfont=dict(size=15),
             hovertemplate=f"📍 Tu comuna: <b>{L['comuna'].get(str(comuna_sel),'')}</b><extra></extra>"))
     fig.update_geos(visible=False, bgcolor="rgba(0,0,0,0)", projection_type="mercator",
-                    lonaxis_range=[-76.5, -66.0], lataxis_range=[-56.0, -17.3])
+                    lonaxis_range=[-85.0, -57.0], lataxis_range=[-56.0, -17.3])
     fig.update_layout(height=640, margin=dict(l=0, r=0, t=8, b=0), paper_bgcolor="white", showlegend=False)
     return fig
 
@@ -411,7 +435,18 @@ def fig_barras_region(territorio, region_sel, L):
     items = sorted(((L["region"].get(str(c), str(c)), s["tasa"] * 100, str(c))
                     for c, s in territorio["region"].items()), key=lambda x: x[1])
     cols = ["#f59e0b" if c == str(region_sel) else "#bcd4f6" for _, _, c in items]
-    fig = go.Figure(go.Bar(x=[v for _, v, _ in items], y=[n.replace("Region ", "") for n, _, _ in items],
+    
+    # Limpieza de preposiciones iniciales
+    y_labels = []
+    for n, _, _ in items:
+        name = n.replace("Region ", "")
+        if name.lower().startswith("de "):
+            name = name[3:]
+        elif name.lower().startswith("del "):
+            name = name[4:]
+        y_labels.append(name)
+        
+    fig = go.Figure(go.Bar(x=[v for _, v, _ in items], y=y_labels,
         orientation="h", marker_color=cols, text=[f"{v:.0f}%" for _, v, _ in items],
         textposition="outside", textfont=dict(size=10, color=AZUL_OSC)))
     fig.update_layout(height=640, margin=dict(l=8, r=24, t=30, b=8),
@@ -421,7 +456,28 @@ def fig_barras_region(territorio, region_sel, L):
     return fig
 
 
-def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
+def fig_barras_comuna(items, comuna_sel):
+    """Ranking horizontal de tasa de acceso por comuna; tu comuna en rojo."""
+    # items es una lista de tuplas: (nombre, tasa_pct, n, codigo_comuna)
+    items_sorted = sorted(items, key=lambda x: x[1])
+    cols = ["#dc2626" if c == str(comuna_sel) else "#bcd4f6" for _, _, _, c in items_sorted]
+    fig = go.Figure(go.Bar(
+        x=[v for _, v, _, _ in items_sorted],
+        y=[n for n, _, _, _ in items_sorted],
+        orientation="h",
+        marker_color=cols,
+        text=[f"{v:.1f}%" for _, v, _, _ in items_sorted],
+        textposition="outside",
+        textfont=dict(size=10, color=AZUL_OSC)
+    ))
+    fig.update_layout(height=400, margin=dict(l=8, r=24, t=30, b=8),
+        title=dict(text="Comunas con mayor tasa de acceso a 1ª preferencia", font=dict(size=13, color=AZUL_OSC)),
+        xaxis=dict(range=[0, 100 if not items_sorted else max(v for _, v, _, _ in items_sorted) * 1.18], ticksuffix="%", showgrid=True, gridcolor="#eef"),
+        yaxis=dict(tickfont=dict(size=10)), plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
+def tabla_rank(rows, idx, incluir_carrera: bool, es_real: bool,
                modo_orden: str = "alcanzo", n: int = 15, umbral: float = 0.5) -> pd.DataFrame:
     """DataFrame para st.dataframe a partir del ranking.
 
@@ -452,8 +508,9 @@ def tabla_rank(rows, idx, incluir_carrera: bool, incluir_margen: bool = True,
         fila["Región"] = str(c["reg_nom"])
         fila["P(acceso)"] = d["p"] * 100
         fila["Corte"] = d["corte"]
-        if incluir_margen:
-            fila["Tu margen"] = d["margen"]
+        # Siempre incluimos el margen, adaptando el nombre según si es real o estimado
+        lbl_margen = "Tu margen" if es_real else "Margen Est."
+        fila[lbl_margen] = d["margen"]
         data.append(fila)
     return pd.DataFrame(data)
 
@@ -465,6 +522,8 @@ def mostrar_tabla(df: pd.DataFrame):
         "Corte": st.column_config.NumberColumn("Corte", format="%.0f", help="Corte regular más reciente (mín. ponderado de los seleccionados)"),
         "Tu margen": st.column_config.NumberColumn("Tu margen", format="%+.0f",
                                                    help="Tu ponderado menos el corte más reciente"),
+        "Margen Est.": st.column_config.NumberColumn("Margen Est.", format="%+.0f",
+                                                    help="Tu ponderado estimado menos el corte más reciente"),
     })
 
 
@@ -640,15 +699,29 @@ with st.sidebar:
     except (TypeError, ValueError):
         _ccod = None
     _com_cols = [c for c in _cols.values() if c.get("com_cod") == _ccod]
-    _deps = [d for d in opt(L["dependencia"]) if any(c.get("dep") == d for c in _com_cols)] or opt(L["dependencia"])
+    _deps_raw = [d for d in opt(L["dependencia"]) if any(c.get("dep") == d for c in _com_cols)] or opt(L["dependencia"])
+    # Si la comuna tiene colegios municipales (3) o SLE (4), incluimos ambos tipos en la lista elegible
+    _deps = []
+    has_public = any(d in ("3", "4") for d in _deps_raw)
+    for d in opt(L["dependencia"]):
+        if d in _deps_raw or (has_public and d in ("3", "4")):
+            _deps.append(d)
     dependencia = st.selectbox("Dependencia del colegio", _deps, format_func=lambda k: L["dependencia"].get(k, k))
-    _rg_avail = set().union(*[set(c.get("ramas", [])) for c in _com_cols if c.get("dep") == dependencia]) if _com_cols else set()
-    _ramas = [r for r in opt(L["rama"]) if {"H": "HC", "T": "TP"}.get(r[0]) in _rg_avail] or opt(L["rama"])
+    
+    # Rama educacional: siempre mostramos todas las opciones para evitar bloqueos y permitir simulaciones libres
+    _ramas = opt(L["rama"])
     rama = st.selectbox("Rama educacional", _ramas, format_func=lambda k: L["rama"].get(k, k))
     # colegio (opcional): coherente con comuna + dependencia + rama (nunca queda vacío salvo comuna sin datos)
     _rg = {"H": "HC", "T": "TP"}.get(str(rama)[:1])
+    
+    # Permite cruzar municipal (3) con SLE (4) de manera transparente
+    def dep_match(s_dep, sel_dep):
+        if sel_dep in ("3", "4"):
+            return s_dep in ("3", "4")
+        return s_dep == sel_dep
+
     _ops = sorted([(r, c["nom"]) for r, c in _cols.items()
-                   if c.get("com_cod") == _ccod and c.get("dep") == dependencia
+                   if c.get("com_cod") == _ccod and dep_match(c.get("dep"), dependencia)
                    and (_rg is None or _rg in (c.get("ramas") or []))], key=lambda t: t[1])
     _nm = {r: n for r, n in _ops}
     rbd_sel = st.selectbox("🏫 Tu colegio (opcional)", [None] + [r for r, _ in _ops],
@@ -669,8 +742,14 @@ with st.sidebar:
 row = subset[subset["univ_display"] == uni_sel].iloc[0]
 cod = int(row["CODIGO_CARRERA"])
 st_info = art.stats.get(str(cod))
+actual_dep = dependencia
+if rbd_sel is not None and str(rbd_sel) in _cols:
+    school_dep = _cols[str(rbd_sel)].get("dep")
+    if school_dep:
+        actual_dep = school_dep
+
 perfil_base = Perfil(cod_carrera=cod, nem=nem, ranking=ranking, promedio_notas=promedio, porc_sup=porc_sup,
-                     region=region, comuna=comuna, dependencia=dependencia, rama=rama, rbd=rbd_sel)
+                     region=region, comuna=comuna, dependencia=actual_dep, rama=rama, rbd=rbd_sel)
 es_post = s_clec >= 100 and s_mate1 >= 100
 perfil_post = replace(perfil_base, clec=s_clec if s_clec >= 100 else None, mate1=s_mate1 if s_mate1 >= 100 else None,
                       mate2=s_mate2 if s_mate2 >= 100 else None, hcsoc=s_hcsoc if s_hcsoc >= 100 else None,
@@ -722,11 +801,37 @@ def render_resultado():
     vc1.plotly_chart(gauge(_p, _gtit), use_container_width=True, key="ver_gauge")
     with vc2:
         st.markdown("<br>", unsafe_allow_html=True)
-        _vm = st.columns(3)
-        _vm[0].metric("Tu ponderado" if _es_real else "🎯 Ponderado estimado", f"{_pond:.0f}" if _pond is not None else "s/d")
-        _vm[1].metric(f"Corte {_canio}", f"{_corte:.0f}" if _corte else "s/d")
+        # Custom HTML metrics row with responsive styles and dynamic colored margin box
+        p_val = f"{_pond:.0f}" if _pond is not None else "s/d"
+        c_val = f"{_corte:.0f}" if _corte else "s/d"
+        
+        m_bg, m_border, m_color, m_lbl, m_txt = "#f1f5f9", "#e2e8f5", "#475569", "Margen", "s/d"
         if _gap is not None:
-            _vm[2].metric("Tu margen" if _es_real else "Margen estimado", f"{-_gap:+.0f}", delta=f"{-_gap:+.0f}")
+            m_val = -_gap
+            m_txt = f"{m_val:+.0f}"
+            m_lbl = "Tu margen" if _es_real else "Margen estimado"
+            if m_val >= 0:
+                m_bg, m_border, m_color = "#dcfce7", "#bbf7d0", "#15803d"
+            else:
+                m_bg, m_border, m_color = "#fee2e2", "#fecaca", "#b91c1c"
+                
+        metrics_html = f"""
+        <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 100px; background: white; border: 1px solid #e2e8f5; border-radius: 12px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(30,58,138,.04); text-align: center;">
+            <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;">{"Tu Ponderado" if _es_real else "Ponderado Est."}</div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: #1e3a8a; margin-top: 4px; line-height: 1;">{p_val}</div>
+          </div>
+          <div style="flex: 1; min-width: 100px; background: white; border: 1px solid #e2e8f5; border-radius: 12px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(30,58,138,.04); text-align: center;">
+            <div style="font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;">Corte {_canio}</div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: #1e3a8a; margin-top: 4px; line-height: 1;">{c_val}</div>
+          </div>
+          <div style="flex: 1; min-width: 100px; background: {m_bg}; border: 1px solid {m_border}; border-radius: 12px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(30,58,138,.04); text-align: center;">
+            <div style="font-size: 0.72rem; color: {m_color}; text-transform: uppercase; letter-spacing: .05em; font-weight: 600;">{m_lbl}</div>
+            <div style="font-size: 1.6rem; font-weight: 800; color: {m_color}; margin-top: 4px; line-height: 1;">{m_txt}</div>
+          </div>
+        </div>
+        """
+        st.markdown(metrics_html, unsafe_allow_html=True)
         if _gap is not None and _gap > 0:
             if _es_real:
                 st.markdown(f"<div class='nota'>📐 <b>¿Cuánto te falta?</b> Tu ponderado (<b>{_pond:.0f}</b>) está "
@@ -743,24 +848,59 @@ def render_resultado():
                 st.markdown(f"<div class='nota'>✅ <b>Vas bien:</b> tu ponderado estimado (~{_pond:.0f}) supera el corte "
                             f"({_corte:.0f}) por ~{-_gap:.0f} pts. Igual depende de cómo rindas.</div>", unsafe_allow_html=True)
         if not _es_real:
-            _, _plo = _esc("p10"); _, _phi = _esc("p90")
-            if _plo is not None and _phi is not None:
-                st.markdown(f"<div class='warn'>🎲 <b>Depende de la PAES:</b> bajo (P10) ~<b>{_plo:.0%}</b>; "
-                            f"alto (P90) ~<b>{_phi:.0%}</b>. La prueba aún no está jugada.</div>", unsafe_allow_html=True)
+            p10_pond, p10_prob = _esc("p10")
+            p50_pond, p50_prob = _esc("p50")
+            p90_pond, p90_prob = _esc("p90")
+            if p10_prob is not None and p90_prob is not None:
+                scenarios_html = f"""
+                <div style="background: white; border: 1px solid #e2e8f5; border-radius: 12px; padding: 14px; margin-top: 10px; box-shadow: 0 2px 8px rgba(30, 58, 138, .04);">
+                  <div style="font-size: 0.86rem; font-weight: 700; color: #1e3a8a; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    🎲 Escenarios posibles según tu rendimiento PAES
+                  </div>
+                  <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                      <span style="color: #b91c1c; font-weight: 600;">🔴 Escenario Pesimista (P10) · Ponderado ~{p10_pond:.0f}</span>
+                      <span style="font-weight: 700; color: #b91c1c;">{p10_prob:.0%}</span>
+                    </div>
+                    <div style="background: #fee2e2; border-radius: 999px; height: 8px; overflow: hidden; border: 1px solid #fecaca;">
+                      <div style="background: #ef4444; width: {p10_prob * 100}%; height: 100%;"></div>
+                    </div>
+                  </div>
+                  <div style="margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                      <span style="color: #2563eb; font-weight: 700;">🔵 Escenario Probable (P50) · Ponderado ~{p50_pond:.0f}</span>
+                      <span style="font-weight: 700; color: #2563eb;">{p50_prob:.0%}</span>
+                    </div>
+                    <div style="background: #dbeafe; border-radius: 999px; height: 8px; overflow: hidden; border: 1px solid #bfdbfe;">
+                      <div style="background: #2563eb; width: {p50_prob * 100}%; height: 100%;"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 3px;">
+                      <span style="color: #15803d; font-weight: 600;">🟢 Escenario Optimista (P90) · Ponderado ~{p90_pond:.0f}</span>
+                      <span style="font-weight: 700; color: #16a34a;">{p90_prob:.0%}</span>
+                    </div>
+                    <div style="background: #dcfce7; border-radius: 999px; height: 8px; overflow: hidden; border: 1px solid #bbf7d0;">
+                      <div style="background: #10b981; width: {p90_prob * 100}%; height: 100%;"></div>
+                    </div>
+                  </div>
+                </div>
+                """
+                st.markdown(scenarios_html, unsafe_allow_html=True)
 
     # distribución del ponderado de los seleccionados (boxplot) + dónde caes tú
     _sel = art.seleccion.get(str(cod))
     if _sel and _pond is not None:
         _corte_box = (art.cortes_hist.get(str(cod)) or {}).get(str(_sel["anio"]))   # corte del MISMO año de la caja
-        st.plotly_chart(fig_seleccion(_sel, _pond, _corte_box, _sel["anio"], _es_real), use_container_width=True, key="box_sel")
+        st.plotly_chart(fig_seleccion(_sel, _pond, _corte_box, _sel["anio"], _es_real, _p), use_container_width=True, key="box_sel")
         _pos = ("**por sobre la mediana**" if _pond >= _sel["p50"] else
                 "**dentro del 50% central**" if _pond >= _sel["p25"] else
                 "**bajo el 25% que entró más bajo**")
         st.caption(f"📊 **Cómo leerlo:** la **caja azul** abarca al 50% central de quienes entraron en {_sel['anio']} "
                    f"(del p25 al p75); la **línea** del medio es la **mediana** ({_sel['p50']:.0f} → la mitad entró con menos "
                    f"y la mitad con más); los **bigotes** llegan del p5 al p95. La línea **roja** es el **corte {_sel['anio']}** "
-                   f"(el mínimo con que entró alguien ese año), por eso coincide con el piso de la caja. El **diamante verde "
-                   f"eres tú** ({'real' if _es_real else 'estimado'}): caes {_pos}.")
+                   f"(el mínimo con que entró alguien ese año), por eso coincide con el piso de la caja. El **círculo coloreado "
+                   f"eres tú** ({'real' if _es_real else 'estimado'}, con color según tu probabilidad de acceso): caes {_pos}.")
 
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
@@ -807,6 +947,10 @@ with tab_res:
 with tab_car:
     st.markdown(f"#### {carrera_sel.title()} · {str(row['UNIV_U']).title()}")
     of = art.oferta.get(str(cod))                         # ficha institucional SIES (nivel/jornada/duración/sede)
+    _area_key = area_de(carrera_sel)
+    _stats_ei = art.empleabilidad_ingresos.get("carreras", {}).get(carrera_sel)
+    if not _stats_ei:
+        _stats_ei = art.empleabilidad_ingresos.get("areas", {}).get(_area_key)
     if of:
         st.markdown(ficha_oferta_html(of), unsafe_allow_html=True)
     cL, cR = st.columns([1, 1])
@@ -821,8 +965,8 @@ with tab_car:
                     unsafe_allow_html=True)
         desg = ([f"{int(v1)} (1er sem)"] if v1 > 0 else []) + ([f"{int(v2)} (2º sem)"] if v2 > 0 else []) \
             + ([f"{int(vac_esp)} (admisión especial: PACE/otros)"] if vac_esp > 0 else [])
-        st.caption(f"📍 {row['reg_nom']} · código {cod}"
-                   + (" · 🗓️ vacantes = " + " + ".join(desg) if len(desg) > 1 else ""))
+        st.caption(f"🔑 Código de carrera DEMRE: {cod}"
+                   + (" · 🗓️ Desglose vacantes: " + " + ".join(desg) if len(desg) > 1 else ""))
         if st_info is None:
             st.markdown("<div class='warn'>⚠️ Carrera sin corte reciente (nueva/sin datos): mayor incertidumbre.</div>",
                         unsafe_allow_html=True)
@@ -871,8 +1015,13 @@ with tab_car:
                         f"subvencionados</b> y <b>{t.get('part_pagado', 0):.0f}%</b> de <b>particulares pagados</b>."
                         + (f"<br><span style='font-size:.85em;color:#475569'>{_mt}</span>" if _mt else "") + "</div>",
                         unsafe_allow_html=True)
-            st.markdown("<div class='warn'>💲 <b>Arancel:</b> no disponible en los datos DEMRE/SIES de este proyecto.</div>",
-                        unsafe_allow_html=True)
+            if _stats_ei and "arancel_anual_promedio" in _stats_ei:
+                arancel_txt = f"${_stats_ei['arancel_anual_promedio']:,} CLP".replace(",", ".")
+                st.markdown(f"<div class='nota'>💲 <b>Arancel anual de referencia (SIES):</b> {arancel_txt}</div>",
+                            unsafe_allow_html=True)
+            else:
+                st.markdown("<div class='warn'>💲 <b>Arancel:</b> no disponible en los datos DEMRE/SIES de este proyecto.</div>",
+                            unsafe_allow_html=True)
         st.caption("El desglose por **establecimiento de origen** es sobre la **matrícula total** de la carrera (todas las "
                    "cohortes que siguen estudiando), no solo la cohorte que entró el último año: el SIES no publica este "
                    "desglose separado para el ingreso de 1er año. Es contexto socioeconómico, no predicción.")
@@ -899,15 +1048,41 @@ with tab_car:
             _pcols[1].plotly_chart(fig_pie_genero(_tu, str(row["UNIV_U"]).title()), use_container_width=True, key="pie_uni")
         st.caption("💡 La **mediana** es más representativa que el promedio (la cola de titulados mayores lo infla). SIES, agregado nacional.")
 
+    # 💼 Éxito Formativo y Futuro Profesional
+    if _stats_ei:
+        st.markdown("<div class='sec'><h3>💼 Éxito Formativo y Futuro Profesional</h3></div>", unsafe_allow_html=True)
+        col_ei1, col_ei2 = st.columns(2)
+        with col_ei1:
+            st.metric(label="Empleabilidad (1er año)", value=f"{_stats_ei['empleabilidad_1anio']}%",
+                      help="Porcentaje de titulados con empleo al año de egreso.")
+            st.metric(label="Tasa de Retención (1er año)", value=f"{_stats_ei['retencion_1anio']}%",
+                      help="Porcentaje de estudiantes de primer año que permanecen en la misma carrera en el segundo año.")
+        with col_ei2:
+            ing_min = _stats_ei["ingreso_4anio_min"]
+            ing_max = _stats_ei["ingreso_4anio_max"]
+            st.metric(label="Ingresos promedio (4° año de egreso)", value=f"${ing_min:,} - ${ing_max:,} CLP".replace(",", "."),
+                      help="Ingresos promedio mensuales líquidos al cuarto año de titulación.")
+            import math
+            sem = float(_stats_ei['sobreduracion_semestres'])
+            sem_reales = math.ceil(sem)
+            st.metric(label="Sobreduración real promedio", value=f"{sem:g} sem. ({sem_reales:d} reales)",
+                      help="Sobreduración real promedio reportada por SIES (promedio matemático). El valor entre paréntesis indica el número mínimo de semestres enteros que el alumno debe cursar en la realidad.")
+        
+        is_generic = carrera_sel not in art.empleabilidad_ingresos.get("carreras", {})
+        ref_level = "el **Área de Conocimiento**" if is_generic else "la **carrera genérica SIES**"
+        st.caption(f"💡 Datos de ingresos, empleabilidad y retención promedio a nivel nacional según {ref_level} (fuente: Mifuturo.cl / SIES).")
+
+
 with tab3:
     st.caption("Te muestro **dónde tienes más chance de quedar**: la misma carrera en todas las "
                "universidades, y **carreras afines de tu área**. Probabilidades **calibradas**. "
                + ("Usando tus **puntajes PAES**." if es_post else "Usando tus **notas** (antes de la PAES; más incierto)."))
     perfil_rec = perfil_exp
-    o1, o2 = st.columns([2, 1])
+    o1, o2, o3 = st.columns([1.8, 1, 1.2])
     orden = o1.radio("Ordenar por", ["🏅 Lo mejor que alcanzo", "🎯 Más probable"], horizontal=True, key="r_orden")
     modo_orden = "alcanzo" if orden.startswith("🏅") else "prob"
     solo_reg = o2.checkbox(f"Solo en {L['region'].get(region, region)}", value=False, key="r_reg")
+    limite_filas = o3.selectbox("Mostrar máximo", [15, 30, 50, 200], format_func=lambda x: "Todas las opciones" if x == 200 else f"{x} filas", key="r_limite")
 
     area_sel = area_de(carrera_sel)
     sub_misma = cat[cat["CARRERA_U"] == carrera_sel]
@@ -920,7 +1095,7 @@ with tab3:
     st.markdown(f"<div class='sec'><h3>📍 {carrera_sel.title()} — dónde tienes más chance</h3></div>", unsafe_allow_html=True)
     r_misma = rankear(art, perfil_rec, sub_misma["CODIGO_CARRERA"].tolist(), modo_modelo)
     if r_misma:
-        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False, incluir_margen=es_post, modo_orden=modo_orden))
+        mostrar_tabla(tabla_rank(r_misma, cat_idx, incluir_carrera=False, es_real=es_post, modo_orden=modo_orden, n=limite_filas))
     else:
         st.info("No hay universidades para mostrar con ese filtro.")
 
@@ -928,7 +1103,7 @@ with tab3:
         st.markdown(f"<div class='sec'><h3>🧭 Otras carreras de tu área: {area_sel}</h3></div>", unsafe_allow_html=True)
         r_area = rankear(art, perfil_rec, sub_area["CODIGO_CARRERA"].tolist(), modo_modelo)
         if r_area:
-            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True, incluir_margen=es_post, modo_orden=modo_orden))
+            mostrar_tabla(tabla_rank(r_area, cat_idx, incluir_carrera=True, es_real=es_post, modo_orden=modo_orden, n=limite_filas))
         else:
             st.info("No hay carreras afines para mostrar con ese filtro.")
     else:
@@ -966,12 +1141,45 @@ with tab_comp:
                     st.info("Faltan datos para estimar.")
                 _canio_c = (art.stats.get(str(codc)) or {}).get("anio", 2026)
                 st.metric(f"Corte {_canio_c}", f"{res['corte']:.0f}" if res["corte"] else "s/d")
-                if c_post and res["margen"] is not None and res["margen"] == res["margen"]:
-                    st.metric("Tu margen", f"{res['margen']:+.0f}")
-                st.metric("Vacantes 2026", f"{int(vac_total_de(rc))}" if vac_total_de(rc) else "s/d")
+                if res["margen"] is not None and pd.notna(res["margen"]):
+                    lbl_margen = "Tu margen" if c_post else "Margen Est."
+                    st.metric(lbl_margen, f"{res['margen']:+.0f}",
+                              help="Diferencia entre tu puntaje ponderado (real o estimado) y el último corte.")
+                
+                # Exige M2 y Mínimo para postular
+                m2_exige = "Sí" if rc.get("EXIGE_MATE2") == "S" else "No"
+                st.metric("Exige M2 / Mín. postular", f"{m2_exige} / {rc['PONDERADO_MINIMO']:.0f} pts" if pd.notna(rc.get('PONDERADO_MINIMO')) else f"{m2_exige} / s/d",
+                          help="¿Exige la prueba de Competencia Matemática 2 (M2)? / Puntaje ponderado mínimo requerido para postular.")
+                
+                vac_1 = float(rc.get("VACANTES_1SEM")) if pd.notna(rc.get("VACANTES_1SEM")) else 0.0
+                vac_2 = float(rc.get("VACANTES_2SEM")) if pd.notna(rc.get("VACANTES_2SEM")) else 0.0
+                vac_reg = vac_1 + vac_2
+                vac_pace = float(rc.get("CAR_VACANTES_PACE")) if pd.notna(rc.get("CAR_VACANTES_PACE")) else 0.0
+                vac_esp = float(rc.get("CDP_VACANTES_ESPECIALES")) if pd.notna(rc.get("CDP_VACANTES_ESPECIALES")) else 0.0
+                vac_gen = float(rc.get("VACANTES_GENERO")) if pd.notna(rc.get("VACANTES_GENERO")) else 0.0
+                st.metric("Vacantes 2026", f"{int(vac_total_de(rc))}" if vac_total_de(rc) else "s/d",
+                          help=f"Regulares: {int(vac_reg)} | PACE: {int(vac_pace)} | Especiales: {int(vac_esp)} | Equidad Género: {int(vac_gen)}")
+                
                 mtr_c = art.matricula.get(str(codc))
                 if mtr_c and mtr_c.get("tasa") is not None:
-                    st.metric("Matríc. efectiva", f"{mtr_c['tasa']:.0%}")
+                    st.metric("Matríc. efectiva", f"{mtr_c['tasa']:.0%}",
+                              help="Porcentaje de vacantes regulares completadas en el proceso anterior.")
+                
+                # SIES Employability and Income Comparison
+                carr_norm_c = rc["CARRERA_U"]
+                ei_c = art.empleabilidad_ingresos.get("carreras", {}).get(carr_norm_c)
+                if not ei_c:
+                    ei_c = art.empleabilidad_ingresos.get("areas", {}).get(rc["area"])
+                if ei_c:
+                    st.metric("Empleabilidad (1er año)", f"{ei_c['empleabilidad_1anio']}%")
+                    min_mill = ei_c['ingreso_4anio_min'] / 1e6
+                    max_mill = ei_c['ingreso_4anio_max'] / 1e6
+                    st.metric("Ingresos 4° año", f"${min_mill:.1f}M - ${max_mill:.1f}M CLP".replace(".", ","),
+                              help="Rango promedio de ingresos líquidos mensuales al cuarto año de egreso.")
+                    if "arancel_anual_promedio" in ei_c:
+                        st.metric("Arancel Promedio", f"${ei_c['arancel_anual_promedio']/1e6:.1f}M/año".replace(".", ","),
+                                  help="Arancel anual promedio cobrado a nivel nacional para esta carrera o área.")
+                
                 st.caption(f"📍 {rc['reg_nom']} · {rc['area'] or 'área s/c'}")
         st.plotly_chart(fig_radar_multi(rows_comp, [str(r["UNIV_U"]).title() for r in rows_comp]),
                         use_container_width=True, key="comp_radar")
@@ -1010,6 +1218,54 @@ with tab4:
             cols[1].metric(f"🔴 {L['comuna'].get(comuna, comuna)}", f"{tr_com['tasa']:.0%}", help=f"n={tr_com['n']:,}")
         prom = sum(s["tasa"] * s["n"] for s in art.territorio["region"].values()) / sum(s["n"] for s in art.territorio["region"].values())
         cols[2].metric("📊 Promedio nacional", f"{prom:.0%}")
+
+    st.markdown("<hr style='margin: 32px 0; border: none; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
+    st.markdown("<div class='sec'><h3>📍 Análisis Comunal — ¿Dónde hay más éxito de admisión?</h3></div>", unsafe_allow_html=True)
+    st.caption("Filtra las comunas por región para analizar el porcentaje de postulantes que logran matricularse en su 1ª preferencia.")
+    
+    # Selector de región para el filtro comunal
+    reg_options = {"Todas": "Todas las regiones"}
+    sorted_reg_keys = sorted(L["region"].keys(), key=int)
+    for k in sorted_reg_keys:
+        reg_options[k] = L["region"][k]
+    
+    # Región de la comuna del alumno para usar de default
+    alumno_reg_code = str(L.get("comuna_region", {}).get(str(comuna), "Todas"))
+    
+    cc1, cc2 = st.columns([1, 1.5])
+    with cc1:
+        default_idx = 0
+        reg_keys_list = list(reg_options.keys())
+        if alumno_reg_code in reg_keys_list:
+            default_idx = reg_keys_list.index(alumno_reg_code)
+        
+        reg_filtro = st.selectbox(
+            "Región a analizar",
+            options=reg_keys_list,
+            format_func=lambda x: reg_options[x],
+            index=default_idx,
+            key="filtro_reg_comunas"
+        )
+        
+        st.info("💡 **Tasa de Acceso Comunal:** Corresponde al porcentaje de postulantes de esa comuna que lograron quedar "
+                "seleccionados en su primera preferencia (el target de nuestro modelo). Permite visualizar las diferencias de éxito regional.")
+        
+    with cc2:
+        comunas_data = []
+        for c_code, s in art.territorio["comuna"].items():
+            if s.get("n", 0) < 15: # Filtro de representatividad mínimo
+                continue
+            c_reg = str(L.get("comuna_region", {}).get(c_code, ""))
+            if reg_filtro == "Todas" or c_reg == reg_filtro:
+                c_name = L["comuna"].get(c_code, c_code)
+                comunas_data.append((c_name, s["tasa"] * 100, s["n"], c_code))
+        
+        top_comunas = sorted(comunas_data, key=lambda x: x[1], reverse=True)[:10]
+        
+        if top_comunas:
+            st.plotly_chart(fig_barras_comuna(top_comunas, comuna), use_container_width=True, key="barras_comunas")
+        else:
+            st.warning("No hay comunas con suficiente cantidad de postulantes en esta región para mostrar datos representativos.")
 
 # ----------------------------------------------------------------- info modelos
 with st.expander("ℹ️ Sobre los modelos y los datos"):
