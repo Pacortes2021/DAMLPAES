@@ -2,10 +2,12 @@
 ### Departamento de Ingeniería Industrial · Universidad de Concepción
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
-[![Streamlit App](https://img.shields.io/badge/Streamlit-1.32+-red.svg)](https://streamlit.io/)
-[![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.4+-orange.svg)](https://scikit-learn.org/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://pacortes2021-damlpaes-srcapp-9nvyyz.streamlit.app)
+[![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.6+-orange.svg)](https://scikit-learn.org/)
 [![Polars](https://img.shields.io/badge/Polars-0.20+-blueviolet.svg)](https://pola.rs/)
-[![Plotly](https://img.shields.io/badge/Plotly-5.18+-blue.svg)](https://plotly.com/)
+[![Plotly](https://img.shields.io/badge/Plotly-6.8+-blue.svg)](https://plotly.com/)
+
+🚀 **Aplicación en producción:** [Lanzar Dashboard en vivo](https://pacortes2021-damlpaes-srcapp-9nvyyz.streamlit.app)
 
 Este repositorio contiene el **Producto Mínimo Viable (MVP)** desarrollado para la asignatura de **Datos y Aprendizaje de Máquinas (DAML) 2026-1** en la Universidad de Concepción. 
 
