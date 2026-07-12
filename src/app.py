@@ -764,6 +764,253 @@ vac_total = v1 + v2 + vac_esp
 if st.session_state.get("show_tut"):                 # panel inline, sobre las pestañas (sin modal)
     render_tutorial()
 
+_area_key = area_de(carrera_sel)
+_stats_ei = art.empleabilidad_ingresos.get("carreras", {}).get(carrera_sel)
+if not _stats_ei:
+    _stats_ei = art.empleabilidad_ingresos.get("areas", {}).get(_area_key)
+
+def generar_pdf_bytes(art, perfil_base, perfil_post, perfil_exp, modo_modelo, _es_real, _p, _pond, _corte, _canio, _sel, _vbanda, _stats_ei, _tq, L, row, carrera_sel, cat, cat_idx, actual_dep, region, comuna, rama):
+    from fpdf import FPDF
+    import math
+
+    class PDFReport(FPDF):
+        def __init__(self):
+            super().__init__(orientation="P", unit="mm", format="A4")
+            self.set_margins(12, 12, 12)
+            self.set_auto_page_break(False)
+
+        def header(self):
+            self.set_fill_color(30, 58, 138)
+            self.rect(0, 0, 210, 32, 'F')
+            self.set_text_color(255, 255, 255)
+            self.set_font('helvetica', 'B', 14)
+            self.set_xy(12, 6)
+            self.cell(0, 8, clean_pdf_str('INFORME PERSONALIZADO DE POSTULACION'), align='L')
+            self.set_font('helvetica', 'B', 8)
+            self.set_text_color(248, 250, 252)
+            self.set_xy(12, 14)
+            self.cell(0, 5, clean_pdf_str('DAML 2026 . UNIVERSIDAD DE CONCEPCION . DEPARTAMENTO DE INGENIERIA INDUSTRIAL'), align='L')
+
+        def footer(self):
+            self.set_y(-12)
+            self.set_font('helvetica', 'I', 7)
+            self.set_text_color(148, 163, 184)
+            self.cell(0, 5, clean_pdf_str('Este informe es referencial y no constituye una garantia de ingreso. Generado por el Sistema DAML 2026 (Grupo 5).'), align='C')
+
+        def draw_card(self, x, y, w, h, title):
+            self.set_fill_color(255, 255, 255)
+            self.set_draw_color(226, 232, 240)
+            self.set_line_width(0.3)
+            self.rect(x, y, w, h, style="FD")
+            self.set_fill_color(241, 245, 249)
+            self.rect(x, y, w, 8, "F")
+            self.set_draw_color(226, 232, 240)
+            self.line(x, y+8, x+w, y+8)
+            self.set_xy(x + 4, y + 2)
+            self.set_font("helvetica", "B", 9)
+            self.set_text_color(30, 58, 138)
+            self.cell(w - 8, 4, clean_pdf_str(title), border=0, align="L")
+
+    def clean_pdf_str(s):
+        if s is None:
+            return ""
+        s = str(s)
+        cleaned = "".join(c for c in s if ord(c) <= 255)
+        cleaned = cleaned.replace('\u201c', '"').replace('\u201d', '"').replace('\u2019', "'").replace('\u2013', '-')
+        return cleaned
+
+    def write_field(pdf, x, y, label, value, val_color=None):
+        pdf.set_xy(x, y)
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(pdf.get_string_width(clean_pdf_str(label)) + 1, 4, clean_pdf_str(label))
+        pdf.set_font("helvetica", "", 8)
+        if val_color:
+            pdf.set_text_color(*val_color)
+        else:
+            pdf.set_text_color(30, 41, 59)
+        pdf.cell(0, 4, clean_pdf_str(value))
+
+    pdf = PDFReport()
+    pdf.add_page()
+
+    pdf.draw_card(12, 38, 89, 36, "1. Perfil del Postulante")
+    _col_nom = (art.rbd_stats.get("colegios", {}).get(str(perfil_base.rbd)) or {}).get("nom") if perfil_base.rbd else "No especificado"
+    write_field(pdf, 16, 48, "Region / Comuna: ", f"{L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}")
+    write_field(pdf, 16, 53.5, "Colegio de origen: ", _col_nom)
+    write_field(pdf, 16, 59, "Dependencia / Rama: ", f"{L['dependencia'].get(actual_dep, actual_dep)} / {L['rama'].get(rama, rama)}")
+    nem_val = f"Promedio {perfil_base.promedio_notas:.2f}" if perfil_base.promedio_notas is not None else f"{perfil_base.nem:.0f} pts" if perfil_base.nem is not None else "s/d"
+    rank_val = f"Top {perfil_base.porc_sup:.0f}%" if perfil_base.porc_sup is not None else f"{perfil_base.ranking:.0f} pts" if perfil_base.ranking is not None else "s/d"
+    write_field(pdf, 16, 64.5, "NEM / Ranking: ", f"NEM: {nem_val}  |  Ranking: {rank_val}")
+
+    pdf.draw_card(109, 38, 89, 52, "2. Carrera de Referencia")
+    write_field(pdf, 113, 48, "Carrera: ", carrera_sel)
+    write_field(pdf, 113, 53.5, "Universidad: ", str(row['UNIV_U']))
+
+    pdf.set_xy(113, 59)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(100, 116, 139)
+    pdf.cell(40, 4, clean_pdf_str("Probabilidad de Acceso:"))
+    pdf.set_font("helvetica", "B", 18)
+    if _p >= 0.66:
+        color_prob = (22, 163, 74)
+    elif _p >= 0.33:
+        color_prob = (245, 158, 11)
+    else:
+        color_prob = (220, 38, 38)
+    pdf.set_text_color(*color_prob)
+    pdf.text(152, 66, f"{_p:.1%}")
+
+    p_val = f"{_pond:.1f} pts" if _pond is not None else "s/d"
+    c_val = f"{_corte:.1f} pts" if _corte else "s/d"
+    write_field(pdf, 113, 71, "Tu Ponderado / Corte: ", f"{p_val}  /  {c_val}")
+    if _corte and _pond is not None:
+        margen = _pond - _corte
+        marg_color = (22, 163, 74) if margen >= 0 else (220, 38, 38)
+        write_field(pdf, 113, 76.5, "Margen de Entrada: ", f"{margen:+.1f} pts", marg_color)
+    else:
+        write_field(pdf, 113, 76.5, "Margen de Entrada: ", "s/d")
+    if _sel and _pond is not None:
+        _pos_txt = ("Sobre la mediana" if _pond >= _sel["p50"] else "En el 50% central" if _pond >= _sel["p25"] else "Bajo el 25% mas bajo")
+        write_field(pdf, 113, 82, "Posicion vs Seleccionados: ", _pos_txt)
+
+    pdf.draw_card(12, 78, 89, 52, "3. Puntajes PAES " + ("Ingresados" if _es_real else "Estimados"))
+    if _es_real:
+        pdf.set_xy(16, 88)
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(50, 4, clean_pdf_str("Prueba"), border="B")
+        pdf.cell(20, 4, clean_pdf_str("Puntaje"), border="B", align="R")
+        idx = 0
+        for t_code in ["CLEC", "MATE1", "MATE2", "HCSOC", "CIEN"]:
+            t_name = TEST_LABEL.get(t_code, t_code)
+            t_val = getattr(perfil_post, t_code.lower(), None)
+            if t_val is not None:
+                y_pos = 94 + idx * 5.5
+                pdf.set_xy(16, y_pos)
+                pdf.set_font("helvetica", "", 8)
+                pdf.set_text_color(30, 41, 59)
+                pdf.cell(50, 4, clean_pdf_str(t_name))
+                pdf.cell(20, 4, f"{t_val:.0f} pts", align="R")
+                idx += 1
+    elif _vbanda:
+        pdf.set_xy(16, 88)
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_text_color(100, 116, 139)
+        pdf.cell(32, 4, clean_pdf_str("Prueba"), border="B")
+        pdf.cell(16, 4, clean_pdf_str("P10 (Pes.)"), border="B", align="R")
+        pdf.cell(16, 4, clean_pdf_str("P50 (Prob.)"), border="B", align="R")
+        pdf.cell(16, 4, clean_pdf_str("P90 (Opt.)"), border="B", align="R")
+        for idx, t_code in enumerate(["CLEC", "MATE1", "MATE2", "HCSOC", "CIEN"]):
+            t_name = TEST_LABEL.get(t_code, t_code)
+            t_data = _vbanda.get(t_code)
+            y_pos = 94 + idx * 5.5
+            pdf.set_xy(16, y_pos)
+            pdf.set_font("helvetica", "", 8)
+            pdf.set_text_color(30, 41, 59)
+            pdf.cell(32, 4, clean_pdf_str(t_name))
+            if t_data:
+                p10 = f"{t_data.get('p10', 0):.0f}"
+                p50 = f"{t_data.get('p50', 0):.0f}"
+                p90 = f"{t_data.get('p90', 0):.0f}"
+                pdf.cell(16, 4, p10, align="R")
+                pdf.cell(16, 4, p50, align="R")
+                pdf.cell(16, 4, p90, align="R")
+            else:
+                pdf.cell(48, 4, "s/d", align="C")
+
+    pdf.draw_card(109, 94, 89, 90, "4. Calidad y Exito Formativo (SIES)")
+    if _stats_ei:
+        min_mill = _stats_ei['ingreso_4anio_min'] / 1e6
+        max_mill = _stats_ei['ingreso_4anio_max'] / 1e6
+        sem = float(_stats_ei['sobreduracion_semestres'])
+        sem_reales = math.ceil(sem)
+        arancel_val = f"${_stats_ei['arancel_anual_promedio']/1e6:.1f}M / ano".replace(".", ",") if "arancel_anual_promedio" in _stats_ei else "s/d"
+        write_field(pdf, 113, 105, "Empleabilidad (1er ano): ", f"{_stats_ei['empleabilidad_1anio']}%")
+        write_field(pdf, 113, 112.5, "Tasa de Retencion (1er ano): ", f"{_stats_ei['retencion_1anio']}%")
+        write_field(pdf, 113, 120, "Ingresos Promedio (4° ano): ", f"${min_mill:.1f}M - ${max_mill:.1f}M CLP".replace(".", ","))
+        write_field(pdf, 113, 127.5, "Sobreduracion real promedio: ", f"{sem:g} semestres ({sem_reales:d} sem. reales)")
+        write_field(pdf, 113, 135, "Arancel Anual Promedio: ", arancel_val)
+    else:
+        pdf.set_xy(113, 105)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 4, clean_pdf_str("No hay datos SIES disponibles para esta carrera."))
+
+    pdf.draw_card(12, 134, 89, 72, "5. Plan B: Misma Carrera en otras Ues")
+    sub_misma = cat[cat["CARRERA_U"] == carrera_sel]
+    r_misma_dl = rankear(art, perfil_exp, sub_misma["CODIGO_CARRERA"].tolist(), modo_modelo)
+    if r_misma_dl:
+        cand_dl = [d for d in r_misma_dl if d["corte"] is not None]
+        sorted_misma = sorted(cand_dl, key=lambda d: d["p"], reverse=True)[:3]
+        for idx, d in enumerate(sorted_misma):
+            c_info = cat_idx.loc[d["cod"]]
+            c_name = str(c_info["NOMBRE_UNIVERSIDAD"]).title()
+            c_reg = str(c_info["reg_nom"])
+            y_pos = 145 + idx * 18
+            pdf.set_xy(16, y_pos)
+            pdf.set_font("helvetica", "B", 8)
+            pdf.set_text_color(30, 41, 59)
+            pdf.cell(0, 4, clean_pdf_str(f"{idx+1}. {c_name}"))
+            y_sub = y_pos + 4.5
+            pdf.set_xy(16, y_sub)
+            pdf.set_font("helvetica", "", 7.5)
+            pdf.set_text_color(100, 116, 139)
+            pdf.cell(0, 4, clean_pdf_str(f"Reg: {c_reg}  .  Prob: {d['p']:.1%}  .  Corte: {d['corte']:.0f}  .  Margen: {d['margen']:+.0f}"))
+    else:
+        pdf.set_xy(16, 145)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 4, clean_pdf_str("No hay datos de otras universidades."))
+
+    pdf.draw_card(12, 210, 89, 72, "6. Plan C: Carreras Afines en el Area")
+    sub_area = cat[(cat["area"] == _area_key) & (cat["CARRERA_U"] != carrera_sel)] if _area_key else cat.iloc[0:0]
+    r_area_dl = rankear(art, perfil_exp, sub_area["CODIGO_CARRERA"].tolist(), modo_modelo)
+    if r_area_dl:
+        cand_area_dl = [d for d in r_area_dl if d["corte"] is not None]
+        sorted_area = sorted(cand_area_dl, key=lambda d: d["p"], reverse=True)[:3]
+        for idx, d in enumerate(sorted_area):
+            c_info = cat_idx.loc[d["cod"]]
+            c_car = str(c_info["NOMBRE_CARRERA"]).title()
+            c_uni = str(c_info["NOMBRE_UNIVERSIDAD"]).title()
+            y_pos = 221 + idx * 18
+            pdf.set_xy(16, y_pos)
+            pdf.set_font("helvetica", "B", 8)
+            pdf.set_text_color(30, 41, 59)
+            pdf.cell(0, 4, clean_pdf_str(f"{idx+1}. {c_car}"))
+            y_sub = y_pos + 4.5
+            pdf.set_xy(16, y_sub)
+            pdf.set_font("helvetica", "", 7.5)
+            pdf.set_text_color(100, 116, 139)
+            pdf.cell(0, 4, clean_pdf_str(f"{c_uni}  .  Prob: {d['p']:.1%}  .  Corte: {d['corte']:.0f}"))
+    else:
+        pdf.set_xy(16, 221)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 4, clean_pdf_str("No hay carreras afines en esta area."))
+
+    pdf.draw_card(109, 188, 89, 94, "7. Datos de Titulados (SIES 2024)")
+    if _tq:
+        write_field(pdf, 113, 199, "Distribucion de Genero: ", f"{_tq['pct_muj']:.0f}% Mujeres  .  {_tq['pct_hom']:.0f}% Hombres")
+        write_field(pdf, 113, 206.5, "Edad Promedio / Mediana: ", f"{_tq['edad_prom']:.1f} anos  /  {_tq['edad_mediana']:.1f} anos")
+        pdf.set_fill_color(226, 232, 240)
+        pdf.rect(113, 215, 81, 4, "F")
+        pct_m = float(_tq['pct_muj'])
+        if pct_m > 0:
+            pdf.set_fill_color(37, 99, 235)
+            pdf.rect(113, 215, 81 * (pct_m / 100.0), 4, "F")
+        pdf.set_xy(113, 220.5)
+        pdf.set_font("helvetica", "I", 7)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 4, clean_pdf_str("Barra: Azul representa % de Mujeres egresadas."))
+    else:
+        pdf.set_xy(113, 199)
+        pdf.set_font("helvetica", "I", 8)
+        pdf.set_text_color(148, 163, 184)
+        pdf.cell(0, 4, clean_pdf_str("No hay datos de titulacion para esta carrera."))
+
+    return bytes(pdf.output())
+
 # ----------------------------------------------------------------- modo: MI RESULTADO
 def render_resultado():
     _vres = predecir(art, perfil_base)
@@ -904,27 +1151,32 @@ def render_resultado():
 
     _tkey = match_titulacion(carrera_sel, art.titulacion.get("por_carrera", {}))
     _tq = art.titulacion.get("por_carrera", {}).get(_tkey)
-    _modo = "POST-PAES (puntajes reales)" if _es_real else "PRE-PAES (estimación por notas)"
-    _col_nom = (art.rbd_stats.get("colegios", {}).get(str(perfil_base.rbd)) or {}).get("nom") if perfil_base.rbd else None
-    _lineas = [f"MI RESULTADO — {carrera_sel.title()} · {str(row['UNIV_U']).title()}",
-               f"Región/comuna: {L['region'].get(region, region)} / {L['comuna'].get(comuna, comuna)}"
-               + (f"  ·  colegio: {_col_nom}" if _col_nom else ""), "",
-               f"Probabilidad de acceso [{_modo}]: {_p:.0%}",
-               (f"Tu ponderado: {_pond:.0f}" if _es_real else f"Ponderado estimado: ~{_pond:.0f}")
-               if _pond is not None else "Ponderado: s/d"]
-    if _corte and _pond is not None:
-        _lineas.append(f"Corte {_canio}: {_corte:.0f}  ·  margen: {(_pond-_corte):+.0f}")
-    if _sel:
-        _lineas.append(f"Seleccionados {_sel['anio']}: entraron entre {_sel['p05']:.0f} y {_sel['p95']:.0f} "
-                       f"(mediana {_sel['p50']:.0f})")
-        if _pond is not None:
-            _lineas.append("Tu posición vs los seleccionados: "
-                           + ("sobre la mediana" if _pond >= _sel["p50"] else
-                              "en el 50% central" if _pond >= _sel["p25"] else "bajo el 25% más bajo"))
-    if _tq:
-        _lineas.append(f"Titulación: {_tq['pct_muj']:.0f}% mujeres · edad mediana {_tq['edad_mediana']:.0f} años")
-    _lineas += ["", "Estimación del dashboard DAML 2026 · Grupo 5 — no es garantía."]
-    st.download_button("📄 Descargar mi resumen", data="\n".join(_lineas), file_name="mi_resultado_PAES.txt", key="dl_resumen")
+
+    try:
+        pdf_bytes = generar_pdf_bytes(
+            art=art, perfil_base=perfil_base, perfil_post=perfil_post, perfil_exp=perfil_exp,
+            modo_modelo=modo_modelo, _es_real=_es_real, _p=_p, _pond=_pond, _corte=_corte,
+            _canio=_canio, _sel=_sel, _vbanda=_vbanda, _stats_ei=_stats_ei, _tq=_tq,
+            L=L, row=row, carrera_sel=carrera_sel, cat=cat, cat_idx=cat_idx,
+            actual_dep=actual_dep, region=region, comuna=comuna, rama=rama
+        )
+        
+        st.download_button(
+            "📄 Descargar mi reporte (PDF)",
+            data=pdf_bytes,
+            file_name=f"Reporte_Postulacion_{carrera_sel.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            key="dl_resumen_pdf"
+        )
+    except Exception as e:
+        st.error(f"Error al generar el PDF: {e}")
+        st.download_button(
+            "📄 Descargar mi resumen (TXT)",
+            data=f"Error en PDF: {e}\nProbabilidad de acceso: {_p:.1%}\nTu ponderado: {_pond:.1f} pts\nCorte: {_corte:.1f} pts",
+            file_name="resumen_postulacion.txt",
+            mime="text/plain",
+            key="dl_resumen_txt_fallback"
+        )
 
     with st.expander("🔬 Ver detalle: efecto del origen" + ("" if _es_real else " y tu puntaje PAES probable")):
         if not _es_real:
